@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Dino Dusk: Pixel Hunt</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no"/>
+  <style>
+    :root {
+      --bg: #0c0f14;
+      --panel: #121722;
+      --panel-2: #0f1420;
+      --ink: #e9eef7;
+      --accent: #64d2ff;
+      --accent-2: #8cff7a;
+      --warning: #ffcc66;
+      --danger: #ff6b6b;
+      --ok: #54e1a6;
+      --muted: #9fb2c7;
+    }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: var(--bg); color: var(--ink);
+      font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial;
+      overflow: hidden;
+    }
+    #game { display: block; width: 100vw; height: 100vh; background: #0b0f15; cursor: crosshair; }
+    .hud {
+      position: fixed; left: 12px; top: 12px; user-select: none; pointer-events: none;
+      background: linear-gradient(180deg, rgba(18,23,34,.9), rgba(12,15,20,.8));
+      border: 1px solid #1b2231; border-radius: 10px; padding: 10px 12px; backdrop-filter: blur(4px);
+      box-shadow: 0 4px 18px rgba(0,0,0,.25);
+    }
+    .hud h1 { margin:0 0 6px; font-size:16px; color: var(--accent); letter-spacing:.5px; }
+    .row { display:flex; gap:10px; align-items:center; margin: 4px 0; }
+    .pill {
+      background: #0a101a; border: 1px solid #1b2231; border-radius: 999px; padding: 3px 8px;
+      color: var(--muted); font-weight: 600; font-size: 12px; white-space: nowrap;
+    }
+    .bar { width: 220px; height: 8px; border-radius: 999px; background: #0a101a; border:1px solid #1b2231; overflow:hidden; }
+    .bar>i { display:block;height:100%; background: linear-gradient(90deg, var(--accent), #9df3ff); width:0%; }
+    .bar.health>i { background: linear-gradient(90deg, var(--ok), #b2fbd7); }
+    .bar.boss>i { background: linear-gradient(90deg, var(--danger), #ff9b9b); }
+    .key { display:inline-flex; align-items:center; justify-content:center; min-width:22px; padding:2px 6px; border-radius:6px;
+           background:#0d1420; border:1px solid #1c2635; color:#c9d6ea; font-weight:700; font-size:12px; }
+    #overlay { position: fixed; inset: 0; display:grid; place-items:center;
+      background: radial-gradient(800px 600px at 50% 40%, rgba(20,26,38,.8), rgba(5,8,12,.9));
+      transition: opacity .25s ease; z-index: 5;}
+    #overlay.hidden { opacity: 0; pointer-events: none; }
+    .card {
+      width:min(92vw, 760px); background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid #1c2537; border-radius: 16px; padding: 22px 22px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    .card h2 { margin:0 0 8px; font-size: 28px; color:#eaf5ff; letter-spacing:.3px; }
+    .card p { color: var(--muted); margin:0 0 12px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .panel { border:1px solid #1b2231; border-radius:10px; padding:12px; background:#0b1019; }
+    .cta { display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      background: linear-gradient(180deg, #0c5a7a, #093a4d); border: 1px solid #1b7ea4; color:#daf6ff; font-weight:800;
+      letter-spacing:.4px; padding:10px 16px; border-radius:12px; cursor:pointer; user-select:none; text-decoration:none; }
+    .cta-row { display:flex; gap:10px; margin-top: 14px; }
+    .badge { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px;
+      background:#0a101a; border:1px solid #1b2231; color:#b9c9de; font-weight:700; }
+    #toast { position: fixed; right: 12px; top: 12px; display:flex; flex-direction: column; gap:8px; z-index: 6; }
+    .toast { background:#0a101a; border:1px solid #1b2231; border-left:4px solid var(--accent);
+      padding: 8px 10px; border-radius:8px; color:#cfe4ff; min-width:220px; box-shadow:0 6px 20px rgba(0,0,0,.2); }
+    .toast.warn { border-left-color: var(--warning); }
+    .toast.danger { border-left-color: var(--danger); }
+    .footnote { color:#8aa2c0; font-size:12px; }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div class="hud" id="hud">
+    <h1>Dino Dusk</h1>
+    <div class="row">
+      <span class="pill">Day <b id="day">1</b></span>
+      <span class="pill">Kills <b id="kills">0</b></span>
+      <span class="pill">Score <b id="score">0</b></span>
+      <span class="pill">Grenades <b id="grenades">1</b></span>
+      <span class="pill">Gun Lvl <b id="gunlvl">1</b></span>
+    </div>
+    <div class="row" title="Time until boss">
+      <div class="bar" style="width:260px"><i id="daybar"></i></div>
+      <span class="pill">⌛ <b id="timeleft">60s</b></span>
+    </div>
+    <div class="row" title="Your health">
+      <div class="bar health"><i id="hpbar"></i></div>
+      <span class="pill">HP <b id="hptext">100</b></span>
+    </div>
+    <div class="row" id="bossRow" style="display:none" title="Boss health">
+      <div class="bar boss" style="width:260px"><i id="bossbar"></i></div>
+      <span class="pill">Boss</span>
+    </div>
+    <div class="row" style="gap:6px; margin-top: 6px; pointer-events: auto;">
+      <span class="badge"><span class="key">WASD</span>/<span class="key">↑↓←→</span> Move</span>
+      <span class="badge"><span class="key">Mouse</span> Aim</span>
+      <span class="badge"><span class="key">L‑Click</span> Shoot</span>
+      <span class="badge"><span class="key">G</span>/<span class="key">R‑Click</span> Grenade</span>
+      <span class="badge"><span class="key">P</span> Pause</span>
+      <span class="badge"><span class="key">F</span> Fullscreen</span>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <div class="card">
+      <h2>Survive the Night. Hunt at Dawn.</h2>
+      <p>WASD or arrows to move, aim with mouse, <b>left‑click</b> to shoot. Pick up crates for <b>grenades</b> &amp; <b>gun upgrades</b>. Beat the <b>T‑Rex</b> boss at the end of each day to advance.</p>
+      <div class="grid">
+        <div class="panel">
+          <b>Objective</b>
+          <ul>
+            <li>Survive raptors &amp; pterodactyls.</li>
+            <li>Day ends → <b>T‑Rex boss</b>.</li>
+            <li>Win to start a harder next day.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <b>Supplies</b>
+          <ul>
+            <li><b>Grenade Crate:</b> +1–2 grenades.</li>
+            <li><b>Gun Upgrade:</b> faster fire &amp; more damage (max 5).</li>
+          </ul>
+        </div>
+      </div>
+      <div class="cta-row">
+        <button id="btnStart" class="cta">▶ Start</button>
+        <button id="btnMute" class="cta" title="Mute/Unmute (M)">🔈 Mute</button>
+        <button id="btnFS" class="cta" title="Fullscreen (F)">⛶ Fullscreen</button>
+      </div>
+      <p class="footnote" style="margin-top:8px">Tip: Right‑click throws a grenade. High score is saved locally.</p>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script type="module">
+  // ===== Dino Dusk — Pixel edition =====
+
+  // -------------------------
+  // Utilities
+  // -------------------------
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const rand = (a, b) => Math.random() * (b - a) + a;
+  const randi = (a, b) => Math.floor(rand(a, b + 1));
+  const choice = (arr) => arr[(Math.random() * arr.length) | 0];
+  const now = () => performance.now();
+
+  class Vec2 {
+    constructor(x=0, y=0) { this.x = x; this.y = y; }
+    copy() { return new Vec2(this.x, this.y); }
+    set(x,y){ this.x=x; this.y=y; return this; }
+    add(v){ this.x+=v.x; this.y+=v.y; return this; }
+    sub(v){ this.x-=v.x; this.y-=v.y; return this; }
+    scale(s){ this.x*=s; this.y*=s; return this; }
+    len(){ return Math.hypot(this.x, this.y); }
+    norm(){ const l=this.len()||1; this.x/=l; this.y/=l; return this; }
+    angle(){ return Math.atan2(this.y, this.x); }
+    static fromAngle(a, mag=1){ return new Vec2(Math.cos(a)*mag, Math.sin(a)*mag); }
+  }
+
+  // -------------------------
+  // Config
+  // -------------------------
+  const CONFIG = {
+    dayLength: 60,
+    baseSpawnInterval: 1.6,
+    raptorBias: 0.68,
+    supplyEveryMinMax: [8, 16],
+    worldMargin: 80,
+    player: {
+      radius: 16, speed: 240, maxHP: 100, invuln: 0.7,
+      baseFireRate: 4, baseBulletDamage: 15, bulletSpeed: 540,
+      fireRatePerLevel: 1.0, dmgPerLevel: 5, maxGunLevel: 5,
+      grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420,
+    },
+    enemies: {
+      raptor: { speed: [110, 160], radius: 18, hp: 32, dmg: 12 },
+      ptero:  { speed: [140, 200], radius: 16, hp: 24, dmg: 10 },
+      trex:   { speed: [90, 160],  radius: 42, hp: 950, dmg: 28, chargeEvery: [2.2, 3.8], chargeBoost: 2.2 }
+    },
+    difficultyPerDay: { hp: 1.18, speed: 1.10, dmg: 1.12, spawnRate: 1.14 },
+  };
+
+  // -------------------------
+  // Canvas
+  // -------------------------
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha:false, desynchronized:false });
+
+  let DPR = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  function resize() {
+    DPR = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width  = Math.floor(w * DPR);
+    canvas.height = Math.floor(h * DPR);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  // -------------------------
+  // Input
+  // -------------------------
+  const Input = { keys:new Set(), mouse:new Vec2(), mdown:false, rdown:false };
+  const keymap = (e) => e.key.length===1 ? e.key.toLowerCase() : e.key;
+  window.addEventListener('keydown', (e) => {
+    const k = keymap(e);
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    Input.keys.add(k);
+    if (k==='p') togglePause();
+    if (k==='r') restart();
+    if (k==='f') toggleFullscreen();
+    if (k==='m') toggleMute();
+  });
+  window.addEventListener('keyup', (e) => { Input.keys.delete(keymap(e)); });
+  canvas.addEventListener('mousedown', (e) => { if (e.button===0) Input.mdown = true; if (e.button===2) Input.rdown = true; });
+  window.addEventListener('mouseup',   (e) => { if (e.button===0) Input.mdown = false; if (e.button===2) Input.rdown = false; });
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    Input.mouse.set(e.clientX - rect.left, e.clientY - rect.top);
+  });
+
+  // -------------------------
+  // Audio (tiny synth)
+  // -------------------------
+  let audioCtx = null;
+  const AudioBus = {
+    muted:false,
+    ensure(){ if (!audioCtx) { const C = window.AudioContext||window.webkitAudioContext; audioCtx = new C(); } },
+    blip({freq=440, dur=.05, vol=.15}={}) { if (this.muted) return; this.ensure();
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='square'; o.frequency.value=freq;
+      g.gain.value=vol; o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+dur); },
+    boom({freq=80, dur=.25, vol=.25}={}) { if (this.muted) return; this.ensure();
+      const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='sawtooth'; o.frequency.setValueAtTime(freq,audioCtx.currentTime);
+      g.gain.setValueAtTime(vol,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+dur);
+      o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+dur); }
+  };
+  function toggleMute(){
+    AudioBus.muted = !AudioBus.muted;
+    showToast(AudioBus.muted ? 'Muted' : 'Unmuted');
+    document.getElementById('btnMute').textContent = AudioBus.muted ? '🔇 Unmute' : '🔈 Mute';
+  }
+
+  // -------------------------
+  // Pixel art sprites
+  // -------------------------
+  const Sprites = {};
+  function makeSprite(w, h, painter){
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const s = c.getContext('2d'); s.imageSmoothingEnabled = false;
+    painter(s, w, h);
+    return c;
+  }
+  function px(ctx, x,y, color){ ctx.fillStyle = color; ctx.fillRect(x,y,1,1); }
+
+  // Player (24x24)
+  Sprites.player = makeSprite(24,24,(s,w,h)=>{
+    const skin = '#f4d7c5', hair='#3a2a1a';
+    for (let i=0;i<6;i++) px(s, 15+i, 3, hair);
+    for (let y=4;y<=7;y++) for (let x=14;x<=20;x++) px(s,x,y, skin);
+    px(s, 17,6,'#000');
+    const jacket='#3ec4ff', shirt='#bfe9ff', outline='#152033', pants='#22334a', boots='#0d121a';
+    s.fillStyle = outline; s.fillRect(5,8,14,1);
+    s.fillStyle = jacket; s.fillRect(6,9,12,9);
+    s.fillStyle = shirt;  s.fillRect(10,10,4,4);
+    s.fillStyle = jacket; s.fillRect(4,10,3,6); s.fillRect(18,10,3,6);
+    s.fillStyle = '#d2e8ff'; s.fillRect(16,11,6,3); s.fillRect(20,9,3,7);
+    s.fillStyle = pants; s.fillRect(8,18,4,4); s.fillRect(12,18,4,4);
+    s.fillStyle = boots; s.fillRect(8,22,4,2); s.fillRect(12,22,4,2);
+  });
+
+  // Raptor (24x24)
+  Sprites.raptor = makeSprite(24,24,(s)=>{
+    const body='#4ecf63', belly='#a7f0b2';
+    s.fillStyle = body; s.fillRect(2,12,6,2); s.fillRect(6,11,4,4);
+    s.fillStyle = body; s.fillRect(9,9,9,8);
+    s.fillStyle = belly; s.fillRect(11,12,6,3);
+    s.fillStyle = body; s.fillRect(17,8,5,5);
+    px(s, 20,9,'#fff'); px(s, 20,10,'#fff'); px(s,21,10,'#000');
+    s.fillStyle = '#2a3c2f'; s.fillRect(11,17,3,3); s.fillRect(15,17,3,3);
+    s.fillStyle = '#eee'; px(s, 11,20,'#eee'); px(s, 16,20,'#eee');
+  });
+
+  // Pterodactyl (24x24)
+  Sprites.ptero = makeSprite(24,24,(s)=>{
+    const wing='#9ddcff', body='#6bb4e6';
+    s.fillStyle = wing;
+    s.beginPath(); s.moveTo(2,12); s.lineTo(10,6); s.lineTo(10,12); s.closePath(); s.fill();
+    s.beginPath(); s.moveTo(22,12); s.lineTo(14,6); s.lineTo(14,12); s.closePath(); s.fill();
+    s.fillStyle = body; s.fillRect(10,10,4,5);
+    s.fillStyle = body; s.fillRect(14,9,4,2); s.fillRect(18,9,3,1);
+    px(s, 15,9,'#001a33');
+  });
+
+  // T-Rex (48x48)
+  Sprites.trex = makeSprite(48,48,(s)=>{
+    const body='#ff6b6b', belly='#ffd0d0', dark='#2a0613';
+    s.fillStyle = body; s.fillRect(8,16,28,18);
+    s.fillStyle = belly; s.fillRect(14,22,16,6);
+    s.fillStyle = body; s.fillRect(30,12,12,12);
+    s.fillStyle = dark; s.fillRect(39,14,3,3);
+    s.fillStyle = dark; s.fillRect(30,18,12,4);
+    s.fillStyle = '#7a2633'; s.fillRect(16,32,6,6); s.fillRect(26,32,6,6);
+    s.fillStyle = '#fff1f1'; s.fillRect(16,38,3,2); s.fillRect(29,38,3,2);
+    s.fillStyle = body; s.fillRect(2,20,8,6);
+  });
+
+  // Bullet & Grenade
+  Sprites.bullet = makeSprite(6,2,(s)=>{ s.fillStyle='#e8f5ff'; s.fillRect(0,0,6,2); });
+  Sprites.grenade = makeSprite(8,8,(s)=>{
+    s.fillStyle = '#8a6b2c'; s.fillRect(2,1,2,2);
+    s.fillStyle = '#ffd36b'; s.fillRect(1,3,6,4);
+  });
+  Sprites.crateGren = makeSprite(14,14,(s)=>{
+    s.fillStyle='#101824'; s.fillRect(0,0,14,14);
+    s.strokeStyle='#203049'; s.lineWidth=2; s.strokeRect(1,1,12,12);
+    s.fillStyle='#ffd36b'; s.fillRect(5,6,4,4);
+  });
+  Sprites.crateGun = makeSprite(14,14,(s)=>{
+    s.fillStyle='#101824'; s.fillRect(0,0,14,14);
+    s.strokeStyle='#203049'; s.lineWidth=2; s.strokeRect(1,1,12,12);
+    s.fillStyle='#64d2ff'; s.fillRect(3,6,8,2); s.fillRect(8,4,3,6);
+  });
+
+  // -------------------------
+  // Entities
+  // -------------------------
+  class Entity {
+    constructor(x, y, r=12) { this.pos = new Vec2(x,y); this.vel = new Vec2(0,0); this.radius = r; this.hp = 1; this.alive = true; }
+    update(dt, game) {}
+    damage(d) { this.hp -= d; if (this.hp <= 0) this.alive = false; }
+    draw(ctx, game) {}
+  }
+
+  class Player extends Entity {
+    constructor(x, y){
+      super(x,y, CONFIG.player.radius);
+      this.maxHP = CONFIG.player.maxHP; this.hp = this.maxHP;
+      this.speed = CONFIG.player.speed; this.invuln = 0;
+      this.shootCD = 0; this.gunLevel = 1; this.grenades = 1;
+      this.aim = new Vec2(1,0); this.score = 0; this.kills = 0;
+    }
+    get fireRate(){ return CONFIG.player.baseFireRate + (this.gunLevel-1)*CONFIG.player.fireRatePerLevel; }
+    get bulletDamage(){ return CONFIG.player.baseBulletDamage + (this.gunLevel-1)*CONFIG.player.dmgPerLevel; }
+    update(dt, game){
+      const v = new Vec2(
+        (Input.keys.has('a') || Input.keys.has('ArrowLeft')  ? -1 : 0) +
+        (Input.keys.has('d') || Input.keys.has('ArrowRight') ?  1 : 0),
+        (Input.keys.has('w') || Input.keys.has('ArrowUp')    ? -1 : 0) +
+        (Input.keys.has('s') || Input.keys.has('ArrowDown')  ?  1 : 0)
+      ); if (v.x||v.y) v.norm().scale(this.speed);
+      this.vel = v; this.pos.add(this.vel.copy().scale(dt));
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      this.pos.x = clamp(this.pos.x, this.radius, w - this.radius);
+      this.pos.y = clamp(this.pos.y, this.radius, h - this.radius);
+      this.aim.set(Input.mouse.x - this.pos.x, Input.mouse.y - this.pos.y).norm();
+
+      // Shooting
+      this.shootCD -= dt;
+      if (Input.mdown && this.shootCD <= 0) {
+        this.shootCD = 1 / this.fireRate;
+        this.shoot(game);
+      }
+
+      // Grenade
+      if (Input.rdown || Input.keys.has('g')) {
+        Input.rdown = false;
+        if (this.grenades > 0) this.throwGrenade(game); else showToast('No grenades!', 'warn');
+      }
+      if (this.invuln > 0) this.invuln -= dt;
+    }
+    shoot(game){
+      const spd = CONFIG.player.bulletSpeed, d = this.bulletDamage;
+      const spread = Math.min(.18, .02 * (this.gunLevel-1));
+      const bullets = this.gunLevel >= 4 ? 2 : 1;
+      for (let i=0;i<bullets;i++){
+        const ang = this.aim.angle() + rand(-spread, spread);
+        const vel = Vec2.fromAngle(ang, spd);
+        game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang);
+      }
+      AudioBus.blip({freq: 720, dur:.03, vol:.12});
+    }
+    throwGrenade(game){
+      this.grenades--;
+      const g = new Grenade(
+        this.pos.x + this.aim.x*(this.radius+6),
+        this.pos.y + this.aim.y*(this.radius+6),
+        this.aim.copy().scale(CONFIG.player.grenadeSpeed)
+      );
+      game.grenades.push(g); AudioBus.blip({freq: 200, dur:.06, vol:.18});
+    }
+    healToFull(){ this.hp = this.maxHP; }
+    draw(ctx, game){
+      const a = this.aim.angle();
+      ctx.save();
+      ctx.globalAlpha = .18; ctx.fillStyle = "#000";
+      ctx.beginPath(); ctx.ellipse(this.pos.x, this.pos.y+this.radius*.4, this.radius*1.2, this.radius*.7, 0, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+      drawSprite(Sprites.player, this.pos.x, this.pos.y, a, this.radius/12);
+      if (game.time % (1/this.fireRate) < .05 && Input.mdown) {
+        ctx.save(); ctx.translate(this.pos.x, this.pos.y); ctx.rotate(a);
+        ctx.fillStyle = "#fff8a0"; ctx.fillRect(this.radius*1.35, -2, 10, 4); ctx.restore();
+      }
+      if (this.invuln > 0) {
+        ctx.save();
+        ctx.globalAlpha = clamp(this.invuln / CONFIG.player.invuln, 0, 1);
+        ctx.strokeStyle = "#ff9b9b"; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius+4, 0, Math.PI*2); ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  class Bullet extends Entity {
+    constructor(x, y, vel, dmg, ang){
+      super(x,y, 4); this.vel = vel; this.dmg = dmg; this.life = 1.2; this.ang = ang||0;
+    }
+    update(dt){
+      this.pos.add(this.vel.copy().scale(dt));
+      this.life -= dt;
+      if (this.life <= 0) this.alive = false;
+      const w=canvas.clientWidth, h=canvas.clientHeight;
+      if (this.pos.x < -20 || this.pos.y < -20 || this.pos.x > w+20 || this.pos.y > h+20) this.alive = false;
+    }
+    draw(ctx){ drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, 1.5); }
+  }
+
+  class Grenade extends Entity {
+    constructor(x, y, vel){ super(x,y, 6); this.vel = vel; this.fuse = CONFIG.player.grenadeFuse; this.exploded=false; }
+    update(dt, game){
+      this.pos.add(this.vel.copy().scale(dt)); this.vel.scale(0.96); this.fuse -= dt;
+      if (!this.exploded && this.fuse <= 0) {
+        this.exploded = true; this.alive = false;
+        game.explode(this.pos.x, this.pos.y, CONFIG.player.grenadeRadius, CONFIG.player.grenadeDamage);
+        AudioBus.boom({freq: 90, dur:.24, vol:.28});
+      }
+    }
+    draw(ctx){ drawSprite(Sprites.grenade, this.pos.x, this.pos.y, 0, 1.6); }
+  }
+
+  class Particle extends Entity {
+    constructor(x,y, vel, life, color, size){ super(x,y, size||2); this.vel=vel; this.life=life; this.color=color||'#fff'; }
+    update(dt){ this.pos.add(this.vel.copy().scale(dt)); this.life -= dt; if (this.life <= 0) this.alive=false; }
+    draw(ctx){ ctx.globalAlpha = Math.max(0, this.life); ctx.fillStyle = this.color;
+      ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
+  }
+
+  class Supply extends Entity {
+    constructor(x,y,type){ super(x,y, 14); this.type=type; this.pulse=0; }
+    apply(player){
+      if (this.type==='grenade'){ const n=randi(1,2); player.grenades+=n; showToast(`+${n} grenade${n>1?'s':''}`); }
+      else { if (player.gunLevel < CONFIG.player.maxGunLevel) { player.gunLevel++; showToast(`Gun upgraded → Lv.${player.gunLevel}`, 'ok'); }
+             else { player.grenades++; showToast('Max gun! +1 grenade','ok'); } }
+    }
+    update(dt){ this.pulse += dt*2.2; }
+    draw(ctx){
+      const glow = (Math.sin(this.pulse)*0.5 + 0.5)*6 + 8;
+      ctx.save(); ctx.globalAlpha = .18; ctx.fillStyle = this.type==='grenade' ? '#ffe59a' : '#a8d5ff';
+      ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius+glow, 0, Math.PI*2); ctx.fill(); ctx.restore();
+      drawSprite(this.type==='grenade'?Sprites.crateGren:Sprites.crateGun, this.pos.x, this.pos.y, 0, 1.6);
+    }
+  }
+
+  class Dino extends Entity {
+    constructor(x,y,r,speed,hp,dmg){ super(x,y,r); this.speed=speed; this.hp=hp; this.dmg=dmg; this.hitCD=0; this.hitFlash=0; }
+    damage(d){ this.hp -= d; this.hitFlash = .12; if (this.hp <= 0) this.alive = false; }
+    hitPlayer(game, player, dt){
+      if (this.hitCD>0) this.hitCD -= dt;
+      const d = Math.hypot(this.pos.x - player.pos.x, this.pos.y - player.pos.y);
+      if (d < this.radius + player.radius) {
+        if (player.invuln<=0) {
+          player.hp -= this.dmg; player.invuln = CONFIG.player.invuln;
+          AudioBus.boom({freq:120, dur:.09, vol:.18});
+          for (let i=0;i<10;i++) game.particles.push(new Particle(player.pos.x, player.pos.y,
+            Vec2.fromAngle(rand(0,Math.PI*2), rand(40,160)), .6, '#ff9b9b', 2));
+          if (player.hp <= 0) game.gameOver();
+        }
+        const dir = player.pos.copy().sub(this.pos).norm(); player.pos.add(dir.scale(10));
+      }
+    }
+  }
+
+  class Raptor extends Dino {
+    constructor(x,y, speed, hp, dmg) { super(x,y, CONFIG.enemies.raptor.radius, speed, hp, dmg); }
+    update(dt, game){
+      const aim = game.player.pos.copy().sub(this.pos).norm();
+      this.vel = aim.scale(this.speed); this.pos.add(this.vel.copy().scale(dt));
+      this.hitPlayer(game, game.player, dt);
+      this.hitFlash = Math.max(0, this.hitFlash - dt);
+    }
+    draw(ctx){
+      const a = this.vel.angle();
+      ctx.save(); ctx.globalAlpha=.16; ctx.fillStyle="#000";
+      ctx.beginPath(); ctx.ellipse(this.pos.x, this.pos.y+this.radius*.4, this.radius, this.radius*.6, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+      drawSprite(Sprites.raptor, this.pos.x, this.pos.y, a, this.radius/12);
+      if (this.hitFlash>0){ ctx.save(); ctx.globalAlpha = this.hitFlash*2; ctx.fillStyle='#fff';
+        ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+3,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    }
+  }
+
+  class Pterodactyl extends Dino {
+    constructor(x,y, speed, hp, dmg){ super(x,y, CONFIG.enemies.ptero.radius, speed, hp, dmg); this.phase = rand(0, Math.PI*2); }
+    update(dt, game){
+      const dir = game.player.pos.copy().sub(this.pos).norm();
+      const perp = new Vec2(-dir.y, dir.x).scale(Math.sin(game.time*2.1 + this.phase) * 0.6);
+      const v = dir.add(perp).norm().scale(this.speed);
+      this.vel = v; this.pos.add(this.vel.copy().scale(dt));
+      this.hitPlayer(game, game.player, dt);
+      this.hitFlash = Math.max(0, this.hitFlash - dt);
+    }
+    draw(ctx){
+      const a = this.vel.angle();
+      ctx.save(); ctx.globalAlpha=.14; ctx.fillStyle="#000";
+      ctx.beginPath(); ctx.ellipse(this.pos.x, this.pos.y+this.radius*.5, this.radius*.9, this.radius*.5, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+      drawSprite(Sprites.ptero, this.pos.x, this.pos.y, a, this.radius/12);
+      if (this.hitFlash>0){ ctx.save(); ctx.globalAlpha = this.hitFlash*2; ctx.fillStyle='#fff';
+        ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+3,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    }
+  }
+
+  class TRex extends Dino {
+    constructor(x,y, speed, hp, dmg){ super(x,y, CONFIG.enemies.trex.radius, speed, hp, dmg);
+      this.isBoss = true; this.chargeCD = rand(...CONFIG.enemies.trex.chargeEvery); this.charging = 0; }
+    update(dt, game){
+      this.chargeCD -= dt;
+      if (this.chargeCD <= 0 && this.charging <= 0) { this.charging = 1.2; this.chargeCD = rand(...CONFIG.enemies.trex.chargeEvery); }
+      const dir = game.player.pos.copy().sub(this.pos).norm();
+      let spd = this.speed; if (this.charging > 0) { this.charging -= dt; spd *= CONFIG.enemies.trex.chargeBoost; }
+      this.vel = dir.scale(spd); this.pos.add(this.vel.copy().scale(dt));
+      this.hitPlayer(game, game.player, dt);
+      this.hitFlash = Math.max(0, this.hitFlash - dt);
+    }
+    draw(ctx){
+      const a = this.vel.angle();
+      ctx.save(); ctx.globalAlpha=.14; ctx.fillStyle="#000";
+      ctx.beginPath(); ctx.ellipse(this.pos.x, this.pos.y+this.radius*.6, this.radius*1.2, this.radius*.7, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+      drawSprite(Sprites.trex, this.pos.x, this.pos.y, a, this.radius/24);
+      if (this.charging>0){ ctx.save(); ctx.globalAlpha = .18; ctx.strokeStyle = "#ff9b9b"; ctx.lineWidth=8;
+        ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+10,0,Math.PI*2); ctx.stroke(); ctx.restore(); }
+      if (this.hitFlash>0){ ctx.save(); ctx.globalAlpha = this.hitFlash*2; ctx.fillStyle='#fff';
+        ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+6,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+    }
+  }
+
+  // -------------------------
+  // Game orchestration
+  // -------------------------
+  function dist(a,b){ return Math.hypot(a.x-b.x, a.y-b.y); }
+  function circleHit(a,b){ return dist(a.pos, b.pos) < (a.radius + b.radius); }
+
+  class Game {
+    constructor(){ this.reset(); }
+    reset(){
+      this.time = 0; this.state = 'menu';
+      this.player = new Player(canvas.clientWidth*0.5, canvas.clientHeight*0.6);
+      this.bullets = []; this.enemies = []; this.grenades = []; this.supplies = []; this.particles = [];
+      this.day = 1; this.dayTimer = 0; this.bossAlive = false;
+      this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
+      this.highScore = Number(localStorage.getItem('dino_highscore') || 0);
+      this.kills = 0; this.score = 0;
+      updateHUD(this);
+    }
+    start(){ this.state='running'; hideOverlay(); showToast('Good luck, hunter!'); }
+    gameOver(){
+      if (this.state==='over') return; this.state='over'; saveHigh(this.score);
+      showOverlay(`Game Over — Day ${this.day}`, `<p>You scored <b>${Math.floor(this.score)}</b> with <b>${this.kills}</b> dinos downed.</p><p>Press <span class="key">R</span> to try again.</p>`);
+      AudioBus.boom({freq:60, dur:.3, vol:.3});
+    }
+    explode(x,y, radius, damage){
+      for (const e of this.enemies) {
+        const d = dist({x,y}, e.pos);
+        if (d < radius + e.radius) { e.damage(damage); if (!e.alive) this.onKill(e); }
+      }
+      for (let i=0;i<38;i++) this.particles.push(new Particle(x,y, Vec2.fromAngle(rand(0,Math.PI*2), rand(80,320)), .8, '#ffd36b', 2));
+    }
+    onKill(e){
+      this.kills++; this.score += 10 * (e.isBoss ? 30 : 1) * this.day;
+      if (!e.isBoss && Math.random()<0.08) this.dropSupply(e.pos.x, e.pos.y);
+      const color = e.isBoss ? '#ffd0d0' : (e instanceof Pterodactyl ? '#9de0ff' : '#6fe27e');
+      for (let i=0;i<14;i++) this.particles.push(new Particle(e.pos.x, e.pos.y,
+        Vec2.fromAngle(rand(0,Math.PI*2), rand(60,200)), .7, color, 2));
+    }
+    dropSupply(x,y){ const type = Math.random() < 0.55 ? 'grenade' : 'gun'; this.supplies.push(new Supply(x,y,type)); }
+    spawnBullet(x,y, vel, dmg, ang){ this.bullets.push(new Bullet(x,y, vel, dmg, ang)); }
+
+    difficultyForDay(day){
+      const m = CONFIG.difficultyPerDay, n = day - 1;
+      return { hp: Math.pow(m.hp, n), speed: Math.pow(m.speed, n), dmg: Math.pow(m.dmg, n),
+               spawnInterval: CONFIG.baseSpawnInterval / Math.pow(m.spawnRate, n) };
+    }
+
+    spawnEnemy(){
+      const w = canvas.clientWidth, h = canvas.clientHeight, m = CONFIG.worldMargin;
+      const edge = choice(['top','bottom','left','right']); let x,y;
+      if (edge==='top'){ x=rand(-m, w+m); y=-m; }
+      else if (edge==='bottom'){ x=rand(-m, w+m); y=h+m; }
+      else if (edge==='left'){ x=-m; y=rand(-m, h+m); }
+      else { x=w+m; y=rand(-m, h+m); }
+
+      const d = this.difficultyForDay(this.day);
+      if (Math.random() < CONFIG.raptorBias){
+        const base = CONFIG.enemies.raptor;
+        this.enemies.push(new Raptor(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+      } else {
+        const base = CONFIG.enemies.ptero;
+        this.enemies.push(new Pterodactyl(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+      }
+    }
+
+    spawnBoss(){
+      const w = canvas.clientWidth, h = canvas.clientHeight, m = CONFIG.worldMargin;
+      const side = choice(['top','bottom','left','right']); let x,y;
+      if (side==='top'){ x=rand(m, w-m); y=-m; }
+      else if (side==='bottom'){ x=rand(m, w-m); y=h+m; }
+      else if (side==='left'){ x=-m; y=rand(m, h-m); }
+      else { x=w+m; y=rand(m, h-m); }
+      const d = this.difficultyForDay(this.day), base = CONFIG.enemies.trex;
+      this.enemies.push(new TRex(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+      this.bossAlive = true; showToast(`Day ${this.day} Boss: T‑Rex`, 'danger');
+    }
+
+    update(dt){
+      if (this.state !== 'running') return;
+
+      this.time += dt;
+      const dcfg = this.difficultyForDay(this.day);
+
+      if (!this.bossAlive) {
+        this.dayTimer += dt;
+        if (this.dayTimer >= CONFIG.dayLength) this.spawnBoss();
+      }
+
+      if (!this.bossAlive) {
+        this.enemySpawnCD -= dt;
+        if (this.enemySpawnCD <= 0) { this.enemySpawnCD = dcfg.spawnInterval * rand(0.7, 1.3); this.spawnEnemy(); }
+      }
+      this.supplyCD -= dt;
+      if (this.supplyCD <= 0) {
+        this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
+        const ang = rand(0, Math.PI*2), r = rand(120, 280);
+        const px = clamp(this.player.pos.x + Math.cos(ang)*r, 24, canvas.clientWidth-24);
+        const py = clamp(this.player.pos.y + Math.sin(ang)*r, 24, canvas.clientHeight-24);
+        this.dropSupply(px, py);
+      }
+
+      this.player.update(dt, this);
+      for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles]) {
+        for (const e of arr) e.update?.(dt, this);
+      }
+
+      // Bullet -> Enemy
+      for (const b of this.bullets) {
+        if (!b.alive) continue;
+        for (const e of this.enemies) {
+          if (!e.alive) continue;
+          if (circleHit(b, e)) {
+            b.alive = false; e.damage(b.dmg);
+            this.particles.push(new Particle(b.pos.x, b.pos.y, Vec2.fromAngle(b.vel.angle(), 120), .3, '#fff', 1.6));
+            if (!e.alive) this.onKill(e); else e.pos.add(b.vel.copy().norm().scale(6));
+            break;
+          }
+        }
+      }
+
+      // Player -> Supply
+      for (const s of this.supplies) {
+        if (circleHit(s, this.player)) { s.alive = false; s.apply(this.player); AudioBus.blip({freq: 520, dur:.05, vol:.15}); }
+      }
+
+      // Cull
+      this.bullets = this.bullets.filter(e => e.alive);
+      this.enemies = this.enemies.filter(e => e.alive);
+      this.grenades = this.grenades.filter(e => e.alive);
+      this.supplies = this.supplies.filter(e => e.alive);
+      this.particles = this.particles.filter(e => e.alive);
+
+      // Boss lifecycle
+      if (this.bossAlive) {
+        const boss = this.enemies.find(e => e.isBoss);
+        if (!boss) {
+          this.bossAlive = false; this.day++; this.dayTimer = 0; this.player.healToFull();
+          showToast(`Day ${this.day} begins — tougher foes ahead.`, 'ok'); AudioBus.blip({freq: 860, dur:.08, vol:.16});
+        }
+      }
+
+      this.score += dt * (2 * this.day);
+      updateHUD(this);
+    }
+
+    render(){
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      ctx.clearRect(0,0,w,h);
+      ctx.imageSmoothingEnabled = false;
+
+      // subtle grid
+      ctx.save(); ctx.globalAlpha=.08; ctx.strokeStyle="#0f1b2c"; ctx.lineWidth=1;
+      const g = 40;
+      for (let x = (this.time*20 % g); x < w; x+=g) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
+      for (let y = (this.time*12 % g); y < h; y+=g) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+      ctx.restore();
+
+      for (const s of this.supplies) s.draw(ctx, this);
+      for (const gr of this.grenades) gr.draw(ctx, this);
+      for (const b of this.bullets) b.draw(ctx, this);
+      for (const e of this.enemies) e.draw(ctx, this);
+      this.player.draw(ctx, this);
+      for (const p of this.particles) p.draw(ctx, this);
+
+      const boss = this.enemies.find(e => e.isBoss);
+      const bossRow = document.getElementById('bossRow');
+      if (boss) {
+        bossRow.style.display = '';
+        const bossbar = document.getElementById('bossbar');
+        bossbar.style.width = `${clamp(boss.hp / (CONFIG.enemies.trex.hp * Math.pow(CONFIG.difficultyPerDay.hp, this.day-1)), 0, 1) * 100}%`;
+      } else {
+        bossRow.style.display = 'none';
+      }
+    }
+  }
+
+  // -------------------------
+  // UI helpers
+  // -------------------------
+  function drawSprite(img, x, y, angle=0, scale=1){
+    ctx.save(); ctx.translate(x,y); if (angle) ctx.rotate(angle); ctx.scale(scale, scale);
+    ctx.imageSmoothingEnabled = false; ctx.drawImage(img, -img.width/2, -img.height/2); ctx.restore();
+  }
+
+  // HUD elements — DECLARE BEFORE new Game() is created
+  const day       = document.getElementById('day');
+  const kills     = document.getElementById('kills');
+  const score     = document.getElementById('score');
+  const grenades  = document.getElementById('grenades');
+  const gunlvl    = document.getElementById('gunlvl');
+  const daybar    = document.getElementById('daybar');
+  const timeleft  = document.getElementById('timeleft');
+  const hpbar     = document.getElementById('hpbar');
+  const hptext    = document.getElementById('hptext');
+
+  function updateHUD(game){
+    day.textContent = game.day;
+    kills.textContent = game.kills;
+    score.textContent = Math.floor(game.score);
+    grenades.textContent = game.player.grenades;
+    gunlvl.textContent = game.player.gunLevel;
+    daybar.style.width = `${clamp(game.dayTimer / CONFIG.dayLength, 0, 1) * 100}%`;
+    timeleft.textContent = game.bossAlive ? 'Boss!' : `${Math.max(0, Math.ceil(CONFIG.dayLength - game.dayTimer))}s`;
+    hpbar.style.width = `${clamp(game.player.hp / game.player.maxHP, 0, 1) * 100}%`;
+    hptext.textContent = Math.max(0, Math.ceil(game.player.hp));
+  }
+
+  const overlay = document.getElementById('overlay');
+  function hideOverlay(){ overlay.classList.add('hidden'); }
+  function showOverlay(title, innerHTML){
+    overlay.innerHTML = `<div class="card"><h2>${title}</h2>${innerHTML||''}<div class="cta-row"><button id="btnRestart" class="cta">↻ Restart</button></div></div>`;
+    overlay.classList.remove('hidden');
+    overlay.querySelector('#btnRestart')?.addEventListener('click', () => restart());
+  }
+
+  const toastWrap = document.getElementById('toast');
+  function showToast(msg, kind){
+    const el = document.createElement('div'); el.className = `toast ${kind||''}`; el.textContent = msg;
+    toastWrap.appendChild(el); setTimeout(() => { el.style.opacity='0'; el.style.transform='translateX(12px)'; }, 1600);
+    setTimeout(() => el.remove(), 1900);
+  }
+  function saveHigh(score){
+    const hi = Number(localStorage.getItem('dino_highscore') || 0);
+    if (score > hi) { localStorage.setItem('dino_highscore', String(Math.floor(score))); showToast(`New High Score: ${Math.floor(score)}!`, 'ok'); }
+  }
+
+  // -------------------------
+  // Game loop & controls  (SINGLE COPY)
+  // -------------------------
+  let game = new Game();
+  let last = now();
+
+  function frame(){
+    const t = now(); let dt = (t - last) / 1000; dt = Math.min(dt, 1/20); last = t;
+    game.update(dt); game.render(); requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  function restart(){ game.reset(); game.start(); }
+  function togglePause(){ if (game.state==='running') { game.state='paused'; showToast('Paused'); } else if (game.state==='paused') { game.state='running'; showToast('Resumed'); } }
+  function toggleFullscreen(){ if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{}); else document.exitFullscreen().catch(()=>{}); }
+  function startGame(){ game.start(); AudioBus.ensure(); }
+
+  document.getElementById('btnStart').addEventListener('click', startGame);
+  document.getElementById('btnMute').addEventListener('click', toggleMute);
+  document.getElementById('btnFS').addEventListener('click', toggleFullscreen);
+
+  document.addEventListener('keydown', (e) => {
+    if (!overlay.classList.contains('hidden') && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault(); startGame();
+    }
+  });
+
+  window.addEventListener('blur', () => { if (game.state==='running') togglePause(); });
+
+  window.addEventListener('resize', () => {
+    game.player.pos.x = Math.max(game.player.radius, Math.min(canvas.clientWidth - game.player.radius, game.player.pos.x));
+    game.player.pos.y = Math.max(game.player.radius, Math.min(canvas.clientHeight - game.player.radius, game.player.pos.y));
+  });
+  </script>
+</body>
+</html>
