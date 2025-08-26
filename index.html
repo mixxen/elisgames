@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Dino Dusk v1.0.0: Pixel Hunt</title>
+  <title>Dino Dusk: Pixel Hunt</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no"/>
   <style>
     :root {
@@ -72,7 +72,7 @@
   <canvas id="game"></canvas>
 
   <div class="hud" id="hud">
-    <h1>Dino Dusk v1.0.0</h1>
+    <h1>Dino Dusk</h1>
     <div class="row">
       <span class="pill">Day <b id="day">1</b></span>
       <span class="pill">Kills <b id="kills">0</b></span>
@@ -138,6 +138,11 @@
   import { generateScenery } from './scenery.js';
   import { createRaptorClass } from './raptor.js';
   import { createProjectileClasses } from './projectiles.js';
+  const version = await fetch('./package.json').then(r=>r.json()).then(p=>p.version).catch(()=>null);
+  if (version) {
+    document.title = `Dino Dusk v${version}: Pixel Hunt`;
+    document.querySelector('#hud h1').textContent = `Dino Dusk v${version}`;
+  }
   // ===== Dino Dusk — Pixel edition =====
 
   // -------------------------
@@ -175,6 +180,7 @@
       radius: 16, speed: 240, maxHP: 100, invuln: 0.7,
       baseFireRate: 4, baseBulletDamage: 15, bulletSpeed: 540,
       fireRatePerLevel: 1.0, dmgPerLevel: 5, maxGunLevel: 9,
+      shotgunFireRate: 0.6,
       grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420, missileCooldown: 5,
     },
     enemies: {
@@ -359,7 +365,11 @@
       this.shootCD = 0; this.gunLevel = 1; this.grenades = 1; this.missileCooldown = 0;
       this.aim = new Vec2(1,0); this.score = 0; this.kills = 0;
     }
-    get fireRate(){ return CONFIG.player.baseFireRate + (this.gunLevel-1)*CONFIG.player.fireRatePerLevel; }
+    get fireRate(){
+      let rate = CONFIG.player.baseFireRate + (this.gunLevel-1)*CONFIG.player.fireRatePerLevel;
+      if (this.gunLevel >= 4) rate *= CONFIG.player.shotgunFireRate;
+      return rate;
+    }
     get bulletDamage(){ return CONFIG.player.baseBulletDamage + (this.gunLevel-1)*CONFIG.player.dmgPerLevel; }
     update(dt, game){
       const v = new Vec2(
