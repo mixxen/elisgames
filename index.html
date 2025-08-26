@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Dino Dusk: Pixel Hunt</title>
+  <title>Dino Dusk v1.0.0: Pixel Hunt</title>
   <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no"/>
   <style>
     :root {
@@ -72,7 +72,7 @@
   <canvas id="game"></canvas>
 
   <div class="hud" id="hud">
-    <h1>Dino Dusk</h1>
+    <h1>Dino Dusk v1.0.0</h1>
     <div class="row">
       <span class="pill">Day <b id="day">1</b></span>
       <span class="pill">Kills <b id="kills">0</b></span>
@@ -175,7 +175,7 @@
       radius: 16, speed: 240, maxHP: 100, invuln: 0.7,
       baseFireRate: 4, baseBulletDamage: 15, bulletSpeed: 540,
       fireRatePerLevel: 1.0, dmgPerLevel: 5, maxGunLevel: 9,
-      grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420,
+      grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420, missileCooldown: 10,
     },
     enemies: {
       raptor: { speed: [110, 160], radius: 18, hp: 32, dmg: 12 },
@@ -356,7 +356,7 @@
       super(x,y, CONFIG.player.radius);
       this.maxHP = CONFIG.player.maxHP; this.hp = this.maxHP;
       this.speed = CONFIG.player.speed; this.invuln = 0;
-      this.shootCD = 0; this.gunLevel = 1; this.grenades = 1;
+      this.shootCD = 0; this.gunLevel = 1; this.grenades = 1; this.missileCooldown = 0;
       this.aim = new Vec2(1,0); this.score = 0; this.kills = 0;
     }
     get fireRate(){ return CONFIG.player.baseFireRate + (this.gunLevel-1)*CONFIG.player.fireRatePerLevel; }
@@ -387,6 +387,7 @@
         if (this.grenades > 0) this.throwGrenade(game); else showToast('No grenades!', 'warn');
       }
       if (this.invuln > 0) this.invuln -= dt;
+      if (this.missileCooldown > 0) this.missileCooldown -= dt;
     }
     shoot(game){
       const spd = CONFIG.player.bulletSpeed, d = this.bulletDamage;
@@ -397,22 +398,23 @@
         const vel = Vec2.fromAngle(ang, spd);
         game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang);
       }
-      if (this.gunLevel >= 4 && this.gunLevel <= 6) {
+      if (this.gunLevel >= 4) {
         const pelletCounts = [3,5,7];
-        const pellets = pelletCounts[this.gunLevel - 4];
+        const pellets = pelletCounts[Math.min(this.gunLevel, 6) - 4];
         for (let i=0;i<pellets;i++){
           const ang = this.aim.angle() + rand(-0.5, 0.5);
           const vel = Vec2.fromAngle(ang, spd * 0.6);
           game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang, {life:0.35, radius:6});
         }
       }
-      if (this.gunLevel >= 7) {
+      if (this.gunLevel >= 7 && this.missileCooldown <= 0) {
         const missiles = Math.min(3, this.gunLevel - 6);
         for (let i=0;i<missiles;i++){
           const ang = this.aim.angle();
           const vel = Vec2.fromAngle(ang, spd * 0.8);
           game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d * 2, ang, {missile:true});
         }
+        this.missileCooldown = CONFIG.player.missileCooldown;
       }
       AudioBus.blip({freq: 720, dur:.03, vol:.12});
     }
