@@ -44,4 +44,15 @@ const { Bullet, Missile } = createProjectileClasses(Entity, Vec2, Particle, make
   assert.equal(game.particles.length, 1);
 }
 
+// Missile self-destructs if target dies
+{
+  const enemy = {pos:new Vec2(0,10), alive:true};
+  const m = new Missile(0,0,new Vec2(10,0),5,0);
+  const game = { enemies:[enemy], particles:[] };
+  m.update(0.1, game); // acquire target
+  enemy.alive = false;
+  m.update(0.1, game);
+  assert.equal(m.alive, false);
+}
+
 console.log('Projectile tests passed');
