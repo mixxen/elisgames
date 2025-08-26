@@ -136,6 +136,7 @@
 
   <script type="module">
   import { generateScenery } from './scenery.js';
+  import { createRaptorClass } from './raptor.js';
   // ===== Dino Dusk — Pixel edition =====
 
   // -------------------------
@@ -497,23 +498,15 @@
     }
   }
 
-  class Raptor extends Dino {
-    constructor(x,y, speed, hp, dmg) { super(x,y, CONFIG.enemies.raptor.radius, speed, hp, dmg); }
-    update(dt, game){
-      const aim = game.player.pos.copy().sub(this.pos).norm();
-      this.vel = aim.scale(this.speed); this.pos.add(this.vel.copy().scale(dt));
-      this.hitPlayer(game, game.player, dt);
-      this.hitFlash = Math.max(0, this.hitFlash - dt);
-    }
-    draw(ctx){
-      const a = this.vel.angle();
-      ctx.save(); ctx.globalAlpha=.16; ctx.fillStyle="#000";
-      ctx.beginPath(); ctx.ellipse(this.pos.x, this.pos.y+this.radius*.4, this.radius, this.radius*.6, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
-      drawSprite(Sprites.raptor, this.pos.x, this.pos.y, a, this.radius/12);
-      if (this.hitFlash>0){ ctx.save(); ctx.globalAlpha = this.hitFlash*2; ctx.fillStyle='#fff';
-        ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+3,0,Math.PI*2); ctx.fill(); ctx.restore(); }
-    }
-  }
+  const Raptor = createRaptorClass(Dino, Vec2);
+  Raptor.prototype.draw = function(ctx){
+    const a = this.vel.angle();
+    ctx.save(); ctx.globalAlpha=.16; ctx.fillStyle="#000";
+    ctx.beginPath(); ctx.ellipse(this.pos.x, this.pos.y+this.radius*.4, this.radius, this.radius*.6, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    drawSprite(Sprites.raptor, this.pos.x, this.pos.y, a, this.radius/12);
+    if (this.hitFlash>0){ ctx.save(); ctx.globalAlpha = this.hitFlash*2; ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+3,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+  };
 
   class Pterodactyl extends Dino {
     constructor(x,y, speed, hp, dmg){ super(x,y, CONFIG.enemies.ptero.radius, speed, hp, dmg); this.phase = rand(0, Math.PI*2); }
