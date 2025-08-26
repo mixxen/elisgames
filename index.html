@@ -137,6 +137,7 @@
   <script type="module">
   import { generateScenery } from './scenery.js';
   import { createRaptorClass } from './raptor.js';
+  import { createProjectileClasses } from './projectiles.js';
   // ===== Dino Dusk — Pixel edition =====
 
   // -------------------------
@@ -173,7 +174,7 @@
     player: {
       radius: 16, speed: 240, maxHP: 100, invuln: 0.7,
       baseFireRate: 4, baseBulletDamage: 15, bulletSpeed: 540,
-      fireRatePerLevel: 1.0, dmgPerLevel: 5, maxGunLevel: 5,
+      fireRatePerLevel: 1.0, dmgPerLevel: 5, maxGunLevel: 7,
       grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420,
     },
     enemies: {
@@ -389,12 +390,25 @@
     }
     shoot(game){
       const spd = CONFIG.player.bulletSpeed, d = this.bulletDamage;
-      const spread = Math.min(.18, .02 * (this.gunLevel-1));
-      const bullets = this.gunLevel >= 4 ? 2 : 1;
-      for (let i=0;i<bullets;i++){
-        const ang = this.aim.angle() + rand(-spread, spread);
-        const vel = Vec2.fromAngle(ang, spd);
-        game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang);
+      if (this.gunLevel >= 7) {
+        const ang = this.aim.angle();
+        const vel = Vec2.fromAngle(ang, spd * 0.8);
+        game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d * 2, ang, {missile:true});
+      } else if (this.gunLevel >= 6) {
+        const pellets = 5;
+        for (let i=0;i<pellets;i++){
+          const ang = this.aim.angle() + rand(-0.5, 0.5);
+          const vel = Vec2.fromAngle(ang, spd * 0.6);
+          game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang, {life:0.35, radius:6});
+        }
+      } else {
+        const spread = Math.min(.18, .02 * (this.gunLevel-1));
+        const bullets = this.gunLevel >= 4 ? 2 : 1;
+        for (let i=0;i<bullets;i++){
+          const ang = this.aim.angle() + rand(-spread, spread);
+          const vel = Vec2.fromAngle(ang, spd);
+          game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang);
+        }
       }
       AudioBus.blip({freq: 720, dur:.03, vol:.12});
     }
@@ -429,20 +443,6 @@
     }
   }
 
-  class Bullet extends Entity {
-    constructor(x, y, vel, dmg, ang){
-      super(x,y, 4); this.vel = vel; this.dmg = dmg; this.life = 1.2; this.ang = ang||0;
-    }
-    update(dt){
-      this.pos.add(this.vel.copy().scale(dt));
-      this.life -= dt;
-      if (this.life <= 0) this.alive = false;
-      const w=canvas.clientWidth, h=canvas.clientHeight;
-      if (this.pos.x < -20 || this.pos.y < -20 || this.pos.x > w+20 || this.pos.y > h+20) this.alive = false;
-    }
-    draw(ctx){ drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, 1.5); }
-  }
-
   class Grenade extends Entity {
     constructor(x, y, vel){ super(x,y, 6); this.vel = vel; this.fuse = CONFIG.player.grenadeFuse; this.exploded=false; }
     update(dt, game){
@@ -462,6 +462,8 @@
     draw(ctx){ ctx.globalAlpha = Math.max(0, this.life); ctx.fillStyle = this.color;
       ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
   }
+
+  const { Bullet, Missile } = createProjectileClasses(Entity, Vec2, Particle, rand, canvas);
 
   class Supply extends Entity {
     constructor(x,y,type){ super(x,y, 14); this.type=type; this.pulse=0; }
@@ -488,6 +490,7 @@
       if (d < this.radius + player.radius) {
         if (player.invuln<=0) {
           player.hp -= this.dmg; player.invuln = CONFIG.player.invuln;
+          if (player.gunLevel > 1) { player.gunLevel--; showToast('Gun level lost', 'warn'); }
           AudioBus.boom({freq:120, dur:.09, vol:.18});
           for (let i=0;i<10;i++) game.particles.push(new Particle(player.pos.x, player.pos.y,
             Vec2.fromAngle(rand(0,Math.PI*2), rand(40,160)), .6, '#ff9b9b', 2));
@@ -592,7 +595,10 @@
         Vec2.fromAngle(rand(0,Math.PI*2), rand(60,200)), .7, color, 2));
     }
     dropSupply(x,y){ const type = Math.random() < 0.55 ? 'grenade' : 'gun'; this.supplies.push(new Supply(x,y,type)); }
-    spawnBullet(x,y, vel, dmg, ang){ this.bullets.push(new Bullet(x,y, vel, dmg, ang)); }
+    spawnBullet(x,y, vel, dmg, ang, opts={}){
+      if (opts.missile) this.bullets.push(new Missile(x,y, vel, dmg, ang));
+      else this.bullets.push(new Bullet(x,y, vel, dmg, ang, opts.life, opts.radius));
+    }
 
     difficultyForDay(day){
       const m = CONFIG.difficultyPerDay, n = day - 1;
@@ -737,6 +743,9 @@
     ctx.save(); ctx.translate(x,y); if (angle) ctx.rotate(angle); ctx.scale(scale, scale);
     ctx.imageSmoothingEnabled = false; ctx.drawImage(img, -img.width/2, -img.height/2); ctx.restore();
   }
+
+  Bullet.prototype.draw = function(ctx){ drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.375); };
+  Missile.prototype.draw = function(ctx){ drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.5); };
 
   // HUD elements — DECLARE BEFORE new Game() is created
   const day       = document.getElementById('day');
