@@ -1,0 +1,12 @@
+{
+  "name": "elisgames",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node test/scenery.test.js",
+    "lint": "eslint scenery.js test/scenery.test.js"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  }
+}
