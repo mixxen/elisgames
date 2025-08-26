@@ -84,14 +84,18 @@
       <div class="bar" style="width:260px"><i id="daybar"></i></div>
       <span class="pill">⌛ <b id="timeleft">60s</b></span>
     </div>
-    <div class="row" title="Your health">
-      <div class="bar health"><i id="hpbar"></i></div>
-      <span class="pill">HP <b id="hptext">100</b></span>
-    </div>
-    <div class="row" id="bossRow" style="display:none" title="Boss health">
-      <div class="bar boss" style="width:260px"><i id="bossbar"></i></div>
-      <span class="pill">Boss</span>
-    </div>
+      <div class="row" title="Your health">
+        <div class="bar health"><i id="hpbar"></i></div>
+        <span class="pill">HP <b id="hptext">100</b></span>
+      </div>
+      <div class="row" title="Special attack charge">
+        <div class="bar" style="width:220px"><i id="spbar"></i></div>
+        <span class="pill">Special</span>
+      </div>
+      <div class="row" id="bossRow" style="display:none" title="Boss health">
+        <div class="bar boss" style="width:260px"><i id="bossbar"></i></div>
+        <span class="pill">Boss</span>
+      </div>
     <div class="row" style="gap:6px; margin-top: 6px; pointer-events: auto;">
       <span class="badge"><span class="key">WASD</span>/<span class="key">↑↓←→</span> Move</span>
       <span class="badge"><span class="key">Mouse</span> Aim</span>
@@ -135,9 +139,10 @@
   <div id="toast"></div>
 
   <script type="module">
-  import { generateScenery } from './scenery.js';
-  import { createRaptorClass } from './raptor.js';
-  import { createProjectileClasses } from './projectiles.js';
+    import { generateScenery } from './scenery.js';
+    import { createRaptorClass } from './raptor.js';
+    import { createProjectileClasses } from './projectiles.js';
+    import { createMeteorClass, specialBarColor } from './special.js';
   const version = await fetch('./package.json').then(r=>r.json()).then(p=>p.version).catch(()=>null);
   if (version) {
     document.title = `Dino Dusk v${version}: Pixel Hunt`;
@@ -487,7 +492,8 @@
       ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; }
   }
 
-  const { Bullet, Missile } = createProjectileClasses(Entity, Vec2, Particle, rand, canvas);
+    const { Bullet, Missile } = createProjectileClasses(Entity, Vec2, Particle, rand, canvas);
+    const Meteor = createMeteorClass(Entity, Vec2, Particle, rand, canvas);
 
   class Supply extends Entity {
     constructor(x,y,type){ super(x,y, 14); this.type=type; this.pulse=0; }
@@ -590,7 +596,7 @@
     reset(){
       this.time = 0; this.state = 'menu';
       this.player = new Player(canvas.clientWidth*0.5, canvas.clientHeight*0.6);
-      this.bullets = []; this.enemies = []; this.grenades = []; this.supplies = []; this.particles = [];
+        this.bullets = []; this.enemies = []; this.grenades = []; this.supplies = []; this.particles = []; this.meteors = [];
       this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight);
       this.day = 1; this.dayTimer = 0; this.bossAlive = false;
       this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
@@ -620,11 +626,13 @@
       for (let i=0;i<14;i++) this.particles.push(new Particle(e.pos.x, e.pos.y,
         Vec2.fromAngle(rand(0,Math.PI*2), rand(60,200)), .7, color, 2));
     }
-    laserBlast(){
-      const x=this.player.pos.x, y=this.player.pos.y;
-      for (const e of this.enemies) {
-        if (!e.alive) continue; e.damage(9999); if (!e.alive) this.onKill(e);
-      }
+      laserBlast(){
+        const w = canvas.clientWidth;
+        for (let i=0;i<5;i++) this.meteors.push(new Meteor(rand(0, w)));
+        const x=this.player.pos.x, y=this.player.pos.y;
+        for (const e of this.enemies) {
+          if (!e.alive) continue; e.damage(9999); if (!e.alive) this.onKill(e);
+        }
       for (let i=0;i<36;i++) this.particles.push(new Particle(x,y, Vec2.fromAngle(i/36*Math.PI*2, 280), .4, '#ff7bff', 2));
       AudioBus.boom({freq:120, dur:.2, vol:.3});
     }
@@ -707,7 +715,7 @@
         if (this.specialTimer <= 0) this.specialActive = false;
       }
 
-      for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles]) {
+        for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles, this.meteors]) {
         for (const e of arr) e.update?.(dt, this);
       }
 
@@ -731,11 +739,12 @@
       }
 
       // Cull
-      this.bullets = this.bullets.filter(e => e.alive);
-      this.enemies = this.enemies.filter(e => e.alive);
-      this.grenades = this.grenades.filter(e => e.alive);
-      this.supplies = this.supplies.filter(e => e.alive);
-      this.particles = this.particles.filter(e => e.alive);
+        this.bullets = this.bullets.filter(e => e.alive);
+        this.enemies = this.enemies.filter(e => e.alive);
+        this.grenades = this.grenades.filter(e => e.alive);
+        this.supplies = this.supplies.filter(e => e.alive);
+        this.particles = this.particles.filter(e => e.alive);
+        this.meteors = this.meteors.filter(e => e.alive);
 
       // Boss lifecycle
       if (this.bossAlive) {
@@ -764,11 +773,12 @@
 
       for (const d of this.scenery) d.draw(ctx, Sprites, drawSprite);
       for (const s of this.supplies) s.draw(ctx, this);
-      for (const gr of this.grenades) gr.draw(ctx, this);
-      for (const b of this.bullets) b.draw(ctx, this);
-      for (const e of this.enemies) e.draw(ctx, this);
-      this.player.draw(ctx, this);
-      for (const p of this.particles) p.draw(ctx, this);
+        for (const gr of this.grenades) gr.draw(ctx, this);
+        for (const b of this.bullets) b.draw(ctx, this);
+        for (const e of this.enemies) e.draw(ctx, this);
+        for (const m of this.meteors) m.draw(ctx, this);
+        this.player.draw(ctx, this);
+        for (const p of this.particles) p.draw(ctx, this);
 
       const boss = this.enemies.find(e => e.isBoss);
       const bossRow = document.getElementById('bossRow');
@@ -801,8 +811,9 @@
   const gunlvl    = document.getElementById('gunlvl');
   const daybar    = document.getElementById('daybar');
   const timeleft  = document.getElementById('timeleft');
-  const hpbar     = document.getElementById('hpbar');
-  const hptext    = document.getElementById('hptext');
+    const hpbar     = document.getElementById('hpbar');
+    const hptext    = document.getElementById('hptext');
+    const spbar     = document.getElementById('spbar');
 
   function updateHUD(game){
     day.textContent = game.day;
@@ -810,10 +821,12 @@
     score.textContent = Math.floor(game.score);
     grenades.textContent = game.player.grenades;
     gunlvl.textContent = game.player.gunLevel;
-    daybar.style.width = `${clamp(game.dayTimer / CONFIG.dayLength, 0, 1) * 100}%`;
-    timeleft.textContent = game.bossAlive ? 'Boss!' : `${Math.max(0, Math.ceil(CONFIG.dayLength - game.dayTimer))}s`;
-    hpbar.style.width = `${clamp(game.player.hp / game.player.maxHP, 0, 1) * 100}%`;
-    hptext.textContent = Math.max(0, Math.ceil(game.player.hp));
+      daybar.style.width = `${clamp(game.dayTimer / CONFIG.dayLength, 0, 1) * 100}%`;
+      timeleft.textContent = game.bossAlive ? 'Boss!' : `${Math.max(0, Math.ceil(CONFIG.dayLength - game.dayTimer))}s`;
+      hpbar.style.width = `${clamp(game.player.hp / game.player.maxHP, 0, 1) * 100}%`;
+      hptext.textContent = Math.max(0, Math.ceil(game.player.hp));
+      spbar.style.width = `${clamp(game.specialCharge / 20, 0, 1) * 100}%`;
+      spbar.style.background = specialBarColor(game.specialCharge);
   }
 
   const overlay = document.getElementById('overlay');
