@@ -1,10 +1,10 @@
 {
   "name": "elisgames",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
-    "test": "node test/scenery.test.js && node test/raptor.test.js && node test/projectiles.test.js && node test/player.test.js",
-    "lint": "eslint scenery.js raptor.js projectiles.js test/scenery.test.js test/raptor.test.js test/projectiles.test.js test/player.test.js"
+    "test": "node test/scenery.test.js && node test/raptor.test.js && node test/projectiles.test.js && node test/player.test.js && node test/grenade.test.js && node test/special.test.js",
+    "lint": "eslint scenery.js raptor.js projectiles.js test/scenery.test.js test/raptor.test.js test/projectiles.test.js test/player.test.js test/grenade.test.js test/special.test.js"
   },
   "devDependencies": {
     "eslint": "^8.57.0"
