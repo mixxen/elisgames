@@ -16,10 +16,10 @@ class Vec2 {
 const rand = (a=0,b=1)=> (a+b)/2;
 const AudioBus = { blip(){} };
 globalThis.rand = rand;
-const CONFIG = { player: { bulletSpeed: 10, missileCooldown: 10 } };
+const CONFIG = { player: { bulletSpeed: 10, missileCooldown: 5 } };
 
 class Player {
-  constructor(){ this.radius=16; this.aim=new Vec2(1,0); this.gunLevel=1; this.missileCooldown=0; }
+  constructor(){ this.radius=16; this.aim=new Vec2(1,0); this.gunLevel=1; this.missileCooldown=0; this.pos=new Vec2(0,0); }
   get bulletDamage(){ return 10; }
   update(dt){ if (this.missileCooldown > 0) this.missileCooldown -= dt; }
   shoot(game){
@@ -29,15 +29,15 @@ class Player {
     for (let i=0;i<baseBullets;i++){
       const ang = this.aim.angle() + rand(-spread, spread);
       const vel = Vec2.fromAngle(ang, spd);
-      game.spawnBullet(0,0,vel,d,ang);
+      game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang);
     }
     if (this.gunLevel >= 4) {
       const pelletCounts = [3,5,7];
       const pellets = pelletCounts[Math.min(this.gunLevel,6) - 4];
       for (let i=0;i<pellets;i++){
         const ang = this.aim.angle() + rand(-0.5, 0.5);
-        const vel = Vec2.fromAngle(ang, spd * 0.6);
-        game.spawnBullet(0,0,vel,d,ang,{life:0.35, radius:6});
+        const vel = Vec2.fromAngle(ang, spd * 0.5);
+        game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang,{life:0.35, radius:6});
       }
     }
     if (this.gunLevel >= 7 && this.missileCooldown <= 0) {
@@ -45,7 +45,7 @@ class Player {
       for (let i=0;i<missiles;i++){
         const ang = this.aim.angle();
         const vel = Vec2.fromAngle(ang, spd * 0.8);
-        game.spawnBullet(0,0,vel,d * 2, ang, {missile:true});
+        game.spawnBullet(this.pos.x - this.aim.x*this.radius, this.pos.y - this.aim.y*this.radius, vel, d * 2, ang, {missile:true});
       }
       this.missileCooldown = CONFIG.player.missileCooldown;
     }
@@ -56,20 +56,23 @@ class Player {
 class Game {
   constructor(){ this.bullets=[]; }
   spawnBullet(x,y,vel,dmg,ang,opts={}){
-    if (opts.missile) this.bullets.push('missile');
-    else if (opts.life) this.bullets.push('pellet');
-    else this.bullets.push('bullet');
+    const type = opts.missile ? 'missile' : opts.life ? 'pellet' : 'bullet';
+    this.bullets.push({type, x, y, vel});
   }
 }
 
-// Level 4: shotgun adds 3 pellets and keeps two bullets
+// Level 4: shotgun adds 3 pellets and keeps two bullets; pellets are slower
 {
   const game = new Game();
   const p = new Player();
   p.gunLevel = 4;
   p.shoot(game);
-  assert.equal(game.bullets.filter(b=>b==='bullet').length, 2);
-  assert.equal(game.bullets.filter(b=>b==='pellet').length, 3);
+  assert.equal(game.bullets.filter(b=>b.type==='bullet').length, 2);
+  assert.equal(game.bullets.filter(b=>b.type==='pellet').length, 3);
+  const bullet = game.bullets.find(b=>b.type==='bullet');
+  const pellet = game.bullets.find(b=>b.type==='pellet');
+  assert.equal(bullet.vel.len(), CONFIG.player.bulletSpeed);
+  assert.equal(pellet.vel.len(), CONFIG.player.bulletSpeed * 0.5);
 }
 
 // Level 6: shotgun adds 7 pellets
@@ -78,40 +81,50 @@ class Game {
   const p = new Player();
   p.gunLevel = 6;
   p.shoot(game);
-  assert.equal(game.bullets.filter(b=>b==='pellet').length, 7);
+  assert.equal(game.bullets.filter(b=>b.type==='pellet').length, 7);
 }
 
 // Level 7: fires missiles while retaining shotgun pellets
-{ 
+{
   const game = new Game();
   const p = new Player();
   p.gunLevel = 7;
   p.shoot(game);
-  assert.equal(game.bullets.filter(b=>b==='missile').length, 1);
-  assert.equal(game.bullets.filter(b=>b==='bullet').length, 2);
-  assert.equal(game.bullets.filter(b=>b==='pellet').length, 7);
+  assert.equal(game.bullets.filter(b=>b.type==='missile').length, 1);
+  assert.equal(game.bullets.filter(b=>b.type==='bullet').length, 2);
+  assert.equal(game.bullets.filter(b=>b.type==='pellet').length, 7);
 }
 
 // Level 9: fires 3 missiles
-{ 
+{
   const game = new Game();
   const p = new Player();
   p.gunLevel = 9;
   p.shoot(game);
-  assert.equal(game.bullets.filter(b=>b==='missile').length, 3);
+  assert.equal(game.bullets.filter(b=>b.type==='missile').length, 3);
 }
 
-// Missile cooldown: second shot within 10s should not fire missile
-{ 
+// Missile cooldown: second shot within 5s should not fire missile
+{
   const game = new Game();
   const p = new Player();
   p.gunLevel = 7;
   p.shoot(game); // first missile
   p.shoot(game); // cooldown active, no missile
-  assert.equal(game.bullets.filter(b=>b==='missile').length, 1);
-  p.update(10); // wait for cooldown
+  assert.equal(game.bullets.filter(b=>b.type==='missile').length, 1);
+  p.update(5); // wait for cooldown
   p.shoot(game); // missile fires again
-  assert.equal(game.bullets.filter(b=>b==='missile').length, 2);
+  assert.equal(game.bullets.filter(b=>b.type==='missile').length, 2);
+}
+
+// Missiles spawn from behind the player
+{
+  const game = new Game();
+  const p = new Player();
+  p.gunLevel = 7;
+  p.shoot(game);
+  const missile = game.bullets.find(b=>b.type==='missile');
+  assert.equal(missile.x, -p.radius);
 }
 
 console.log('Player weapon tests passed');
