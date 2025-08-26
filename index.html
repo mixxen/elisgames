@@ -175,7 +175,7 @@
       radius: 16, speed: 240, maxHP: 100, invuln: 0.7,
       baseFireRate: 4, baseBulletDamage: 15, bulletSpeed: 540,
       fireRatePerLevel: 1.0, dmgPerLevel: 5, maxGunLevel: 9,
-      grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420, missileCooldown: 10,
+      grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420, missileCooldown: 5,
     },
     enemies: {
       raptor: { speed: [110, 160], radius: 18, hp: 32, dmg: 12 },
@@ -403,7 +403,7 @@
         const pellets = pelletCounts[Math.min(this.gunLevel, 6) - 4];
         for (let i=0;i<pellets;i++){
           const ang = this.aim.angle() + rand(-0.5, 0.5);
-          const vel = Vec2.fromAngle(ang, spd * 0.6);
+          const vel = Vec2.fromAngle(ang, spd * 0.5);
           game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang, {life:0.35, radius:6});
         }
       }
@@ -412,7 +412,7 @@
         for (let i=0;i<missiles;i++){
           const ang = this.aim.angle();
           const vel = Vec2.fromAngle(ang, spd * 0.8);
-          game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d * 2, ang, {missile:true});
+          game.spawnBullet(this.pos.x - this.aim.x*this.radius, this.pos.y - this.aim.y*this.radius, vel, d * 2, ang, {missile:true});
         }
         this.missileCooldown = CONFIG.player.missileCooldown;
       }

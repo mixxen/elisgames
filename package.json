@@ -1,6 +1,6 @@
 {
   "name": "elisgames",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "test": "node test/scenery.test.js && node test/raptor.test.js && node test/projectiles.test.js && node test/player.test.js",
