@@ -22,18 +22,27 @@ export function createProjectileClasses(Entity, Vec2, Particle, rand = Math.rand
   class Missile extends Bullet {
     constructor(x, y, vel, dmg, ang) {
       super(x, y, vel, dmg, ang, 2.5, 6);
+      this.target = null;
     }
-    update(dt, game) {
-      const speed = this.vel.len();
-      let target = null;
+    findTarget(game) {
+      let closest = null;
       let dist = Infinity;
       for (const e of game.enemies) {
         if (!e.alive) continue;
         const d = Math.hypot(e.pos.x - this.pos.x, e.pos.y - this.pos.y);
-        if (d < dist) { dist = d; target = e; }
+        if (d < dist) { dist = d; closest = e; }
       }
-      if (target) {
-        const desired = target.pos.copy().sub(this.pos).norm().scale(speed);
+      return closest;
+    }
+    update(dt, game) {
+      if (!this.target) this.target = this.findTarget(game);
+      if (this.target && !this.target.alive) {
+        this.alive = false;
+        return;
+      }
+      if (this.target) {
+        const speed = this.vel.len();
+        const desired = this.target.pos.copy().sub(this.pos).norm().scale(speed);
         this.vel.add(desired.sub(this.vel).scale(0.1));
         this.ang = this.vel.angle();
       }
