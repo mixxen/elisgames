@@ -16,10 +16,15 @@ class Vec2 {
 const rand = (a=0,b=1)=> (a+b)/2;
 const AudioBus = { blip(){} };
 globalThis.rand = rand;
-const CONFIG = { player: { bulletSpeed: 10, missileCooldown: 5 } };
+const CONFIG = { player: { bulletSpeed: 10, missileCooldown: 5, baseFireRate: 4, fireRatePerLevel: 1, shotgunFireRate: 0.6 } };
 
 class Player {
   constructor(){ this.radius=16; this.aim=new Vec2(1,0); this.gunLevel=1; this.missileCooldown=0; this.pos=new Vec2(0,0); }
+  get fireRate(){
+    let rate = CONFIG.player.baseFireRate + (this.gunLevel-1)*CONFIG.player.fireRatePerLevel;
+    if (this.gunLevel >= 4) rate *= CONFIG.player.shotgunFireRate;
+    return rate;
+  }
   get bulletDamage(){ return 10; }
   update(dt){ if (this.missileCooldown > 0) this.missileCooldown -= dt; }
   shoot(game){
@@ -125,6 +130,14 @@ class Game {
   p.shoot(game);
   const missile = game.bullets.find(b=>b.type==='missile');
   assert.equal(missile.x, -p.radius);
+}
+
+// Shotgun reduces fire rate
+{
+  const p = new Player();
+  p.gunLevel = 4;
+  const expected = (CONFIG.player.baseFireRate + 3*CONFIG.player.fireRatePerLevel) * CONFIG.player.shotgunFireRate;
+  assert.equal(p.fireRate, expected);
 }
 
 console.log('Player weapon tests passed');
