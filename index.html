@@ -214,18 +214,26 @@
   // -------------------------
   // Input
   // -------------------------
-  const Input = { keys:new Set(), mouse:new Vec2(), mdown:false, rdown:false };
+  const Input = { keys:new Set(), mouse:new Vec2(), mdown:false, rdown:false, gdown:false, special:false };
   const keymap = (e) => e.key.length===1 ? e.key.toLowerCase() : e.key;
   window.addEventListener('keydown', (e) => {
     const k = keymap(e);
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
     Input.keys.add(k);
     if (k==='p') togglePause();
-    if (k==='r') restart();
     if (k==='f') toggleFullscreen();
     if (k==='m') toggleMute();
+    if (k==='g' && !e.repeat) Input.gdown = true;
+    if (k==='r' && !e.repeat) {
+      if (game.state==='running') Input.special = true; else restart();
+    }
   });
-  window.addEventListener('keyup', (e) => { Input.keys.delete(keymap(e)); });
+  window.addEventListener('keyup', (e) => {
+    const k = keymap(e);
+    Input.keys.delete(k);
+    if (k==='g') Input.gdown = false;
+    if (k==='r') Input.special = false;
+  });
   canvas.addEventListener('mousedown', (e) => { if (e.button===0) Input.mdown = true; if (e.button===2) Input.rdown = true; });
   window.addEventListener('mouseup',   (e) => { if (e.button===0) Input.mdown = false; if (e.button===2) Input.rdown = false; });
   canvas.addEventListener('mousemove', (e) => {
@@ -392,8 +400,8 @@
       }
 
       // Grenade
-      if (Input.rdown || Input.keys.has('g')) {
-        Input.rdown = false;
+      if (Input.rdown || Input.gdown) {
+        Input.rdown = false; Input.gdown = false;
         if (this.grenades > 0) this.throwGrenade(game); else showToast('No grenades!', 'warn');
       }
       if (this.invuln > 0) this.invuln -= dt;
@@ -588,6 +596,7 @@
       this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
       this.highScore = Number(localStorage.getItem('dino_highscore') || 0);
       this.kills = 0; this.score = 0;
+      this.specialCharge = 0; this.specialActive = false; this.specialTimer = 0; this.specialPulseTimer = 0;
       updateHUD(this);
     }
     start(){ this.state='running'; hideOverlay(); showToast('Good luck, hunter!'); }
@@ -605,10 +614,19 @@
     }
     onKill(e){
       this.kills++; this.score += 10 * (e.isBoss ? 30 : 1) * this.day;
+      this.specialCharge = Math.min(20, this.specialCharge + 1);
       if (!e.isBoss && Math.random()<0.08) this.dropSupply(e.pos.x, e.pos.y);
       const color = e.isBoss ? '#ffd0d0' : (e instanceof Pterodactyl ? '#9de0ff' : '#6fe27e');
       for (let i=0;i<14;i++) this.particles.push(new Particle(e.pos.x, e.pos.y,
         Vec2.fromAngle(rand(0,Math.PI*2), rand(60,200)), .7, color, 2));
+    }
+    laserBlast(){
+      const x=this.player.pos.x, y=this.player.pos.y;
+      for (const e of this.enemies) {
+        if (!e.alive) continue; e.damage(9999); if (!e.alive) this.onKill(e);
+      }
+      for (let i=0;i<36;i++) this.particles.push(new Particle(x,y, Vec2.fromAngle(i/36*Math.PI*2, 280), .4, '#ff7bff', 2));
+      AudioBus.boom({freq:120, dur:.2, vol:.3});
     }
     dropSupply(x,y){ const type = Math.random() < 0.55 ? 'grenade' : 'gun'; this.supplies.push(new Supply(x,y,type)); }
     spawnBullet(x,y, vel, dmg, ang, opts={}){
@@ -677,6 +695,18 @@
       }
 
       this.player.update(dt, this);
+      if (Input.special) {
+        Input.special = false;
+        if (this.specialCharge >= 20 && !this.specialActive) {
+          this.specialActive = true; this.specialTimer = 5; this.specialPulseTimer = 0; this.specialCharge = 0;
+        }
+      }
+      if (this.specialActive) {
+        this.specialTimer -= dt; this.specialPulseTimer -= dt;
+        if (this.specialPulseTimer <= 0 && this.specialTimer > 0) { this.specialPulseTimer += 1; this.laserBlast(); }
+        if (this.specialTimer <= 0) this.specialActive = false;
+      }
+
       for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles]) {
         for (const e of arr) e.update?.(dt, this);
       }
