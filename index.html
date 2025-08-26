@@ -135,6 +135,7 @@
   <div id="toast"></div>
 
   <script type="module">
+  import { generateScenery } from './scenery.js';
   // ===== Dino Dusk — Pixel edition =====
 
   // -------------------------
@@ -324,6 +325,18 @@
     s.fillStyle='#101824'; s.fillRect(0,0,14,14);
     s.strokeStyle='#203049'; s.lineWidth=2; s.strokeRect(1,1,12,12);
     s.fillStyle='#64d2ff'; s.fillRect(3,6,8,2); s.fillRect(8,4,3,6);
+  });
+
+  Sprites.grass = makeSprite(12,6,(s)=>{
+    s.fillStyle='#1e5d2b'; s.fillRect(0,3,12,3);
+    s.fillStyle='#2f7d31'; s.fillRect(2,1,8,4);
+  });
+  Sprites.tree = makeSprite(20,24,(s)=>{
+    s.fillStyle='#4d3218'; s.fillRect(8,10,4,14);
+    s.fillStyle='#1e5d2b'; s.beginPath(); s.arc(10,8,8,0,Math.PI*2); s.fill();
+  });
+  Sprites.rock = makeSprite(14,10,(s)=>{
+    s.fillStyle='#505762'; s.beginPath(); s.moveTo(3,0); s.lineTo(11,0); s.lineTo(14,6); s.lineTo(11,10); s.lineTo(3,10); s.lineTo(0,4); s.closePath(); s.fill();
   });
 
   // -------------------------
@@ -558,6 +571,7 @@
       this.time = 0; this.state = 'menu';
       this.player = new Player(canvas.clientWidth*0.5, canvas.clientHeight*0.6);
       this.bullets = []; this.enemies = []; this.grenades = []; this.supplies = []; this.particles = [];
+      this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight);
       this.day = 1; this.dayTimer = 0; this.bossAlive = false;
       this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
       this.highScore = Number(localStorage.getItem('dino_highscore') || 0);
@@ -703,6 +717,7 @@
       for (let y = (this.time*12 % g); y < h; y+=g) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
       ctx.restore();
 
+      for (const d of this.scenery) d.draw(ctx, Sprites, drawSprite);
       for (const s of this.supplies) s.draw(ctx, this);
       for (const gr of this.grenades) gr.draw(ctx, this);
       for (const b of this.bullets) b.draw(ctx, this);
