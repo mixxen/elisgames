@@ -143,6 +143,7 @@
     import { createRaptorClass } from './raptor.js';
     import { createProjectileClasses } from './projectiles.js';
     import { createMeteorClass, specialBarColor } from './special.js';
+    import { createAudioBus } from './audio.js';
   const version = await fetch('./package.json').then(r=>r.json()).then(p=>p.version).catch(()=>null);
   if (version) {
     document.title = `Dino Dusk v${version}: Pixel Hunt`;
@@ -249,18 +250,7 @@
   // -------------------------
   // Audio (tiny synth)
   // -------------------------
-  let audioCtx = null;
-  const AudioBus = {
-    muted:false,
-    ensure(){ if (!audioCtx) { const C = window.AudioContext||window.webkitAudioContext; audioCtx = new C(); } },
-    blip({freq=440, dur=.05, vol=.15}={}) { if (this.muted) return; this.ensure();
-      const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='square'; o.frequency.value=freq;
-      g.gain.value=vol; o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+dur); },
-    boom({freq=80, dur=.25, vol=.25}={}) { if (this.muted) return; this.ensure();
-      const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type='sawtooth'; o.frequency.setValueAtTime(freq,audioCtx.currentTime);
-      g.gain.setValueAtTime(vol,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+dur);
-      o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+dur); }
-  };
+  const AudioBus = createAudioBus();
   function toggleMute(){
     AudioBus.muted = !AudioBus.muted;
     showToast(AudioBus.muted ? 'Muted' : 'Unmuted');
@@ -675,7 +665,7 @@
       else { x=w+m; y=rand(m, h-m); }
       const d = this.difficultyForDay(this.day), base = CONFIG.enemies.trex;
       this.enemies.push(new TRex(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
-      this.bossAlive = true; showToast(`Day ${this.day} Boss: T‑Rex`, 'danger');
+      this.bossAlive = true; showToast(`Day ${this.day} Boss: T‑Rex`, 'danger'); AudioBus.roar();
     }
 
     update(dt){
