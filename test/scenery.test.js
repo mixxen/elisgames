@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Scenery, generateScenery } from '../scenery.js';
+import { Scenery, generateScenery, scrollScenery } from '../scenery.js';
 
 // deterministic pseudo-random generator
 function makeRand(values) {
@@ -30,6 +30,18 @@ function makeRand(values) {
     assert.equal(y, 6);
   });
   assert.ok(called);
+}
+
+// Test scrollScenery moves and spawns items
+{
+  const rand = makeRand([0.2, 0.3, 0.8]);
+  const items = [new Scenery(10, 5, 'tree'), new Scenery(-60, 10, 'rock')];
+  scrollScenery(items, 100, 50, 20, 1, rand);
+  assert.equal(items.length, 2);
+  assert.deepEqual(items.map(i => [i.x, i.y, i.type]), [
+    [-10, 5, 'tree'],
+    [110, 15, 'rock']
+  ]);
 }
 
 console.log('All tests passed');
