@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Scenery, generateScenery, scrollScenery } from '../scenery.js';
+import { Scenery, generateScenery, scrollScenery, backgroundForEnv } from '../scenery.js';
 
 // deterministic pseudo-random generator
 function makeRand(values) {
@@ -76,6 +76,13 @@ function makeRand(values) {
   scrollScenery(items, 100, 50, 20, 1, rand, 'transition');
   assert.equal(items.length, 1);
   assert.equal(items[0].type, 'whitewash');
+}
+
+// Test background colors for each environment
+{
+  assert.equal(backgroundForEnv('land'), '#002b11');
+  assert.equal(backgroundForEnv('water'), '#001a33');
+  assert.equal(backgroundForEnv('transition'), '#704214');
 }
 
 console.log('All tests passed');

@@ -139,7 +139,7 @@
   <div id="toast"></div>
 
   <script type="module">
-    import { Scenery, generateScenery, scrollScenery } from './scenery.js';
+    import { Scenery, generateScenery, scrollScenery, backgroundForEnv } from './scenery.js';
     import { createRaptorClass } from './raptor.js';
     import { createProjectileClasses } from './projectiles.js';
     import { createMeteorClass, specialBarColor } from './special.js';
@@ -840,6 +840,7 @@
 
     render(){
       const w = canvas.clientWidth, h = canvas.clientHeight;
+      canvas.style.background = backgroundForEnv(this.environment);
       ctx.clearRect(0,0,w,h);
       ctx.imageSmoothingEnabled = false;
 
@@ -934,8 +935,13 @@
   let last = now();
 
   function frame(){
-    const t = now(); let dt = (t - last) / 1000; dt = Math.min(dt, 1/20); last = t;
-    game.update(dt); game.render(); requestAnimationFrame(frame);
+    const t = now();
+    let dt = (t - last) / 1000;
+    dt = Math.min(dt, 1/20);
+    game.update(dt);
+    game.render();
+    last = now();
+    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
