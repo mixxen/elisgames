@@ -52,3 +52,15 @@ export function scrollScenery(items, width, height, speed, dt, rand = Math.rando
     }
   }
 }
+
+export function backgroundForEnv(env = 'land') {
+  switch (env) {
+    case 'water':
+      return '#001a33';
+    case 'transition':
+      return '#704214';
+    case 'land':
+    default:
+      return '#002b11';
+  }
+}
