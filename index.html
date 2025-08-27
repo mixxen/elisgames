@@ -298,6 +298,18 @@
     s.fillStyle = '#eee'; px(s, 11,20,'#eee'); px(s, 16,20,'#eee');
   });
 
+  // Water Dino (24x24)
+  Sprites.waterdino = makeSprite(24,24,(s)=>{
+    const body='#5ab4ff', belly='#bfe9ff';
+    s.fillStyle = body; s.fillRect(2,12,6,2); s.fillRect(6,11,4,4);
+    s.fillStyle = body; s.fillRect(9,9,9,8);
+    s.fillStyle = belly; s.fillRect(11,12,6,3);
+    s.fillStyle = body; s.fillRect(17,8,5,5);
+    px(s, 20,9,'#fff'); px(s, 20,10,'#fff'); px(s,21,10,'#000');
+    s.fillStyle = '#2a3c2f'; s.fillRect(11,17,3,3); s.fillRect(15,17,3,3);
+    s.fillStyle = '#eee'; px(s, 11,20,'#eee'); px(s, 16,20,'#eee');
+  });
+
   // Pterodactyl (24x24)
   Sprites.ptero = makeSprite(24,24,(s)=>{
     const wing='#9ddcff', body='#6bb4e6';
@@ -319,6 +331,19 @@
     s.fillStyle = dark; s.fillRect(30,18,12,4);
     s.fillStyle = '#7a2633'; s.fillRect(16,32,6,6); s.fillRect(26,32,6,6);
     s.fillStyle = '#fff1f1'; s.fillRect(16,38,3,2); s.fillRect(29,38,3,2);
+    s.fillStyle = body; s.fillRect(2,20,8,6);
+  });
+
+  // Mosasaurus (48x48)
+  Sprites.mosasaurus = makeSprite(48,48,(s)=>{
+    const body='#5ab4ff', belly='#bfe9ff', dark='#103b5b';
+    s.fillStyle = body; s.fillRect(8,16,28,18);
+    s.fillStyle = belly; s.fillRect(14,22,16,6);
+    s.fillStyle = body; s.fillRect(30,12,12,12);
+    s.fillStyle = dark; s.fillRect(39,14,3,3);
+    s.fillStyle = dark; s.fillRect(30,18,12,4);
+    s.fillStyle = '#0b2a3d'; s.fillRect(16,32,6,6); s.fillRect(26,32,6,6);
+    s.fillStyle = '#e6f7ff'; s.fillRect(16,38,3,2); s.fillRect(29,38,3,2);
     s.fillStyle = body; s.fillRect(2,20,8,6);
   });
 
@@ -350,6 +375,10 @@
   Sprites.rock = makeSprite(14,10,(s)=>{
     s.fillStyle='#505762'; s.beginPath(); s.moveTo(3,0); s.lineTo(11,0); s.lineTo(14,6); s.lineTo(11,10); s.lineTo(3,10); s.lineTo(0,4); s.closePath(); s.fill();
   });
+
+  Sprites.beach = makeSprite(12,6,(s)=>{ s.fillStyle='#f4e7b6'; s.fillRect(0,0,12,6); });
+  Sprites.whitewash = makeSprite(16,8,(s)=>{ s.fillStyle='#ffffff'; s.beginPath(); s.arc(8,4,4,0,Math.PI*2); s.fill(); });
+  Sprites.wave = makeSprite(20,10,(s)=>{ s.fillStyle='#5ab4ff'; s.beginPath(); s.arc(10,10,10,Math.PI,0); s.fill(); });
 
   // -------------------------
   // Entities
@@ -532,6 +561,16 @@
       ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+3,0,Math.PI*2); ctx.fill(); ctx.restore(); }
   };
 
+  const WaterDino = createRaptorClass(Dino, Vec2);
+  WaterDino.prototype.draw = function(ctx){
+    const a = this.vel.angle();
+    ctx.save(); ctx.globalAlpha=.16; ctx.fillStyle="#000";
+    ctx.beginPath(); ctx.ellipse(this.pos.x, this.pos.y+this.radius*.4, this.radius, this.radius*.6, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    drawSprite(Sprites.waterdino, this.pos.x, this.pos.y, a, this.radius/12);
+    if (this.hitFlash>0){ ctx.save(); ctx.globalAlpha = this.hitFlash*2; ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+3,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+  };
+
   class Pterodactyl extends Dino {
     constructor(x,y, speed, hp, dmg){ super(x,y, CONFIG.enemies.ptero.radius, speed, hp, dmg); this.phase = rand(0, Math.PI*2); }
     update(dt, game){
@@ -576,6 +615,18 @@
     }
   }
 
+  class Mosasaurus extends TRex {}
+  Mosasaurus.prototype.draw = function(ctx){
+    const a = this.vel.angle();
+    ctx.save(); ctx.globalAlpha=.14; ctx.fillStyle="#000";
+    ctx.beginPath(); ctx.ellipse(this.pos.x, this.pos.y+this.radius*.6, this.radius*1.2, this.radius*.7, 0, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    drawSprite(Sprites.mosasaurus, this.pos.x, this.pos.y, a, this.radius/24);
+    if (this.charging>0){ ctx.save(); ctx.globalAlpha = .18; ctx.strokeStyle = "#ff9b9b"; ctx.lineWidth=8;
+      ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+10,0,Math.PI*2); ctx.stroke(); ctx.restore(); }
+    if (this.hitFlash>0){ ctx.save(); ctx.globalAlpha = this.hitFlash*2; ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(this.pos.x,this.pos.y,this.radius+6,0,Math.PI*2); ctx.fill(); ctx.restore(); }
+  };
+
   // -------------------------
   // Game orchestration
   // -------------------------
@@ -588,7 +639,8 @@
       this.time = 0; this.state = 'menu';
       this.player = new Player(canvas.clientWidth*0.5, canvas.clientHeight*0.6);
         this.bullets = []; this.enemies = []; this.grenades = []; this.supplies = []; this.particles = []; this.meteors = [];
-      this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight);
+      this.environment = 'land';
+      this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, this.environment);
       this.day = 1; this.dayTimer = 0; this.bossAlive = false;
       this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
       this.highScore = Number(localStorage.getItem('dino_highscore') || 0);
@@ -650,7 +702,11 @@
       const d = this.difficultyForDay(this.day);
       if (Math.random() < CONFIG.raptorBias){
         const base = CONFIG.enemies.raptor;
-        this.enemies.push(new Raptor(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+        if (this.environment === 'water') {
+          this.enemies.push(new WaterDino(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+        } else {
+          this.enemies.push(new Raptor(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+        }
       } else {
         const base = CONFIG.enemies.ptero;
         this.enemies.push(new Pterodactyl(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
@@ -665,8 +721,14 @@
       else if (side==='left'){ x=-m; y=rand(m, h-m); }
       else { x=w+m; y=rand(m, h-m); }
       const d = this.difficultyForDay(this.day), base = CONFIG.enemies.trex;
-      this.enemies.push(new TRex(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
-      this.bossAlive = true; showToast(`Day ${this.day} Boss: T‑Rex`, 'danger'); AudioBus.roar();
+      if (this.environment === 'water') {
+        this.enemies.push(new Mosasaurus(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+        showToast(`Day ${this.day} Boss: Mosasaurus`, 'danger');
+      } else {
+        this.enemies.push(new TRex(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+        showToast(`Day ${this.day} Boss: T‑Rex`, 'danger');
+      }
+      this.bossAlive = true; AudioBus.roar();
     }
 
     update(dt){
@@ -715,7 +777,7 @@
       for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles, this.meteors]) {
         for (const e of arr) e.pos.x -= scroll;
       }
-      scrollScenery(this.scenery, canvas.clientWidth, canvas.clientHeight, CONFIG.scrollSpeed, dt);
+      scrollScenery(this.scenery, canvas.clientWidth, canvas.clientHeight, CONFIG.scrollSpeed, dt, Math.random, this.environment);
 
       // Bullet -> Enemy
       for (const b of this.bullets) {
@@ -748,7 +810,14 @@
       if (this.bossAlive) {
         const boss = this.enemies.find(e => e.isBoss);
         if (!boss) {
+          const prevEnv = this.environment;
           this.bossAlive = false; this.day++; this.dayTimer = 0; this.player.healToFull();
+          this.environment = Math.floor((this.day-1)/3)%2 === 0 ? 'land' : 'water';
+          if (this.environment !== prevEnv) {
+            this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, 'transition');
+          } else {
+            this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, this.environment);
+          }
           showToast(`Day ${this.day} begins — tougher foes ahead.`, 'ok'); AudioBus.blip({freq: 860, dur:.08, vol:.16});
         }
       }
