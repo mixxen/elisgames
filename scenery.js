@@ -17,8 +17,12 @@ export class Scenery {
   }
 }
 
-export function generateScenery(count, width, height, rand = Math.random) {
-  const types = ['grass', 'tree', 'rock'];
+export function generateScenery(count, width, height, env = 'land', rand = Math.random) {
+  const types = env === 'transition'
+    ? ['beach', 'whitewash']
+    : env === 'water'
+      ? ['wave']
+      : ['grass', 'tree', 'rock'];
   const items = [];
   for (let i = 0; i < count; i++) {
     const x = rand() * width;
@@ -29,8 +33,12 @@ export function generateScenery(count, width, height, rand = Math.random) {
   return items;
 }
 
-export function scrollScenery(items, width, height, speed, dt, rand = Math.random) {
-  const types = ['tree', 'rock'];
+export function scrollScenery(items, width, height, speed, dt, rand = Math.random, env = 'land') {
+  const types = env === 'transition'
+    ? ['beach', 'whitewash']
+    : env === 'water'
+      ? ['wave']
+      : ['tree', 'rock'];
   for (const s of items) {
     s.update(dt, speed);
   }
