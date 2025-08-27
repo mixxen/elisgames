@@ -640,6 +640,8 @@
       this.player = new Player(canvas.clientWidth*0.5, canvas.clientHeight*0.6);
         this.bullets = []; this.enemies = []; this.grenades = []; this.supplies = []; this.particles = []; this.meteors = [];
       this.environment = 'land';
+      this.nextEnvironment = null;
+      this.transitionTimer = 0;
       this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, this.environment);
       this.day = 1; this.dayTimer = 0; this.bossAlive = false;
       this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
@@ -778,6 +780,13 @@
         for (const e of arr) e.pos.x -= scroll;
       }
       scrollScenery(this.scenery, canvas.clientWidth, canvas.clientHeight, CONFIG.scrollSpeed, dt, Math.random, this.environment);
+      if (this.environment === 'transition') {
+        this.transitionTimer -= dt;
+        if (this.transitionTimer <= 0) {
+          this.environment = this.nextEnvironment;
+          this.nextEnvironment = null;
+        }
+      }
 
       // Bullet -> Enemy
       for (const b of this.bullets) {
@@ -812,10 +821,13 @@
         if (!boss) {
           const prevEnv = this.environment;
           this.bossAlive = false; this.day++; this.dayTimer = 0; this.player.healToFull();
-          this.environment = Math.floor((this.day-1)/3)%2 === 0 ? 'land' : 'water';
-          if (this.environment !== prevEnv) {
-            this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, 'transition');
+          const newEnv = Math.floor((this.day-1)/3)%2 === 0 ? 'land' : 'water';
+          if (newEnv !== prevEnv) {
+            this.nextEnvironment = newEnv;
+            this.environment = 'transition';
+            this.transitionTimer = canvas.clientWidth / CONFIG.scrollSpeed;
           } else {
+            this.environment = newEnv;
             this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, this.environment);
           }
           showToast(`Day ${this.day} begins — tougher foes ahead.`, 'ok'); AudioBus.blip({freq: 860, dur:.08, vol:.16});

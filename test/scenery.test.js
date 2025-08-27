@@ -69,4 +69,13 @@ function makeRand(values) {
   assert.deepEqual(items.map(i => i.type), ['beach', 'whitewash']);
 }
 
+// Test scrollScenery spawns items in transition environment
+{
+  const rand = makeRand([0.2, 0.3, 0.7]);
+  const items = [new Scenery(-60, 10, 'beach')];
+  scrollScenery(items, 100, 50, 20, 1, rand, 'transition');
+  assert.equal(items.length, 1);
+  assert.equal(items[0].type, 'whitewash');
+}
+
 console.log('All tests passed');
