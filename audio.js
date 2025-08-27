@@ -41,7 +41,7 @@ export function createAudioBus(getContext) {
       o.start();
       o.stop(audioCtx.currentTime + dur);
     },
-    roar({ freq = 60, dur = 0.6, vol = 0.4 } = {}) {
+    roar({ freq = 60, dur = 3.0, vol = 0.5 } = {}) {
       if (bus.muted) return;
       bus.ensure();
       if (!audioCtx) return;
