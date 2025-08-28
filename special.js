@@ -1,5 +1,5 @@
 export function specialBarColor(charge) {
-  return charge >= 20
+  return charge >= 30
     ? 'linear-gradient(90deg, var(--accent-2), #b2ff9f)'
     : 'linear-gradient(90deg, var(--accent), #9df3ff)';
 }

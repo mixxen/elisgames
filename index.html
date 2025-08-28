@@ -364,6 +364,11 @@
     s.strokeStyle='#203049'; s.lineWidth=2; s.strokeRect(1,1,12,12);
     s.fillStyle='#64d2ff'; s.fillRect(3,6,8,2); s.fillRect(8,4,3,6);
   });
+  Sprites.crateShot = makeSprite(14,14,(s)=>{
+    s.fillStyle='#101824'; s.fillRect(0,0,14,14);
+    s.strokeStyle='#203049'; s.lineWidth=2; s.strokeRect(1,1,12,12);
+    s.fillStyle='#ff64d2'; s.fillRect(3,6,8,2); s.fillRect(8,4,3,6);
+  });
 
   Sprites.grass = makeSprite(12,6,(s)=>{
     s.fillStyle='#1e5d2b'; s.fillRect(0,3,12,3);
@@ -551,9 +556,9 @@
     update(dt){ this.pulse += dt*2.2; }
     draw(ctx){
       const glow = (Math.sin(this.pulse)*0.5 + 0.5)*6 + 8;
-      ctx.save(); ctx.globalAlpha = .18; ctx.fillStyle = this.type==='grenade' ? '#ffe59a' : '#a8d5ff';
+      ctx.save(); ctx.globalAlpha = .18; ctx.fillStyle = this.type==='grenade' ? '#ffe59a' : this.type==='shotgun' ? '#ffa8e2' : '#a8d5ff';
       ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius+glow, 0, Math.PI*2); ctx.fill(); ctx.restore();
-      drawSprite(this.type==='grenade'?Sprites.crateGren:Sprites.crateGun, this.pos.x, this.pos.y, 0, 1.6);
+      drawSprite(this.type==='grenade'?Sprites.crateGren:this.type==='shotgun'?Sprites.crateShot:Sprites.crateGun, this.pos.x, this.pos.y, 0, 1.6);
     }
   }
 
@@ -707,7 +712,7 @@
     }
     onKill(e, fromSpecial=false){
       this.kills++; this.score += 10 * (e.isBoss ? 30 : 1) * this.day;
-      if (!fromSpecial) this.specialCharge = Math.min(20, this.specialCharge + 1);
+      if (!fromSpecial) this.specialCharge = Math.min(30, this.specialCharge + 1);
       if (!e.isBoss && Math.random()<0.08) this.dropSupply(e.pos.x, e.pos.y);
       const color = e.isBoss ? '#ffd0d0' : (e instanceof Pterodactyl ? '#9de0ff' : '#6fe27e');
       for (let i=0;i<14;i++) this.particles.push(new Particle(e.pos.x, e.pos.y,
@@ -718,7 +723,9 @@
         for (let i=0;i<5;i++) this.meteors.push(new Meteor(rand(0, w)));
         const x=this.player.pos.x, y=this.player.pos.y;
         for (const e of this.enemies) {
-          if (!e.alive) continue; e.damage(9999); if (!e.alive) this.onKill(e, true);
+          if (!e.alive || e.isBoss) continue;
+          e.damage(9999);
+          if (!e.alive) this.onKill(e, true);
         }
       for (let i=0;i<36;i++) this.particles.push(new Particle(x,y, Vec2.fromAngle(i/36*Math.PI*2, 280), .4, '#ff7bff', 2));
       AudioBus.boom({freq:120, dur:.2, vol:.3});
@@ -809,7 +816,7 @@
       this.player.update(dt, this);
       if (Input.special) {
         Input.special = false;
-        if (this.specialCharge >= 20 && !this.specialActive) {
+        if (this.specialCharge >= 30 && !this.specialActive) {
           this.specialActive = true; this.specialTimer = 5; this.specialPulseTimer = 0; this.specialCharge = 0;
         }
       }
@@ -967,7 +974,7 @@
       timeleft.textContent = game.bossAlive ? 'Boss!' : `${Math.max(0, Math.ceil(CONFIG.dayLength - game.dayTimer))}s`;
       hpbar.style.width = `${clamp(game.player.hp / game.player.maxHP, 0, 1) * 100}%`;
       hptext.textContent = Math.max(0, Math.ceil(game.player.hp));
-      spbar.style.width = `${clamp(game.specialCharge / 20, 0, 1) * 100}%`;
+      spbar.style.width = `${clamp(game.specialCharge / 30, 0, 1) * 100}%`;
       spbar.style.background = specialBarColor(game.specialCharge);
   }
 

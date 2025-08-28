@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 class Game {
   constructor(){ this.specialCharge=0; }
-  onKill(fromSpecial=false){ if(!fromSpecial) this.specialCharge=Math.min(20,this.specialCharge+1); }
+  onKill(fromSpecial=false){ if(!fromSpecial) this.specialCharge=Math.min(30,this.specialCharge+1); }
 }
 
 const g=new Game();
