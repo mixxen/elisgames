@@ -21,6 +21,7 @@ class Player {
   get bulletDamage(){ return 10; }
   shoot(game){
     const level=this.machineLevel;
+    if(level<=0) return;
     const base=CONFIG.player.bulletSpeed;
     const speeds={slow:base*0.7, medium:base, fast:base*1.3};
     const life=level===1?1.2:2.5;
@@ -48,6 +49,10 @@ class Game {
   constructor(){ this.bullets=[]; }
   spawnBullet(x,y,vel,dmg,ang,opts={}){ this.bullets.push({x,y,vel,dmg,ang,opts}); }
 }
+
+// Level 0: no shots fired
+{ const game=new Game(); const p=new Player(); p.machineLevel=0; p.shoot(game);
+  assert.equal(game.bullets.length,0); }
 
 // Level 1: single slow shot
 { const game=new Game(); const p=new Player(); p.machineLevel=1; p.shoot(game);

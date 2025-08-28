@@ -13,10 +13,11 @@ const AudioBus = { blip(){} };
 const CONFIG = { player:{ bulletSpeed:10 } };
 
 class Player {
-  constructor(){ this.radius=16; this.aim=new Vec2(1,0); this.shotgunLevel=1; this.pos=new Vec2(0,0); }
+  constructor(){ this.radius=16; this.aim=new Vec2(1,0); this.shotgunLevel=0; this.pos=new Vec2(0,0); }
   get bulletDamage(){ return 10; }
   shootShotgun(game){
     const level=this.shotgunLevel;
+    if(level<=0) return;
     const baseSpeed=CONFIG.player.bulletSpeed*0.8;
     const life=level>=9?0.8:0.4;
     let front=3, back=0;
@@ -46,6 +47,10 @@ class Player {
 }
 
 class Game{ constructor(){ this.bullets=[]; } spawnBullet(x,y,vel,dmg,ang,opts){ this.bullets.push({vel,dmg,opts}); } }
+
+// Level 0: no bullets
+{ const game=new Game(); const p=new Player(); p.shotgunLevel=0; p.shootShotgun(game);
+  assert.equal(game.bullets.length,0); }
 
 // Level 1: 3 front short-range bullets
 { const game=new Game(); const p=new Player(); p.shotgunLevel=1; p.shootShotgun(game);
