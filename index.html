@@ -79,6 +79,7 @@
       <span class="pill">Score <b id="score">0</b></span>
       <span class="pill">Grenades <b id="grenades">1</b></span>
       <span class="pill">Machine Lvl <b id="machlvl">1</b></span>
+      <span class="pill">Shotgun Lvl <b id="shotlvl">1</b></span>
     </div>
     <div class="row" title="Time until boss">
       <div class="bar" style="width:260px"><i id="daybar"></i></div>
@@ -124,6 +125,7 @@
           <ul>
             <li><b>Grenade Crate:</b> +1–2 grenades.</li>
             <li><b>Gun Upgrade:</b> faster fire &amp; more damage (max 5).</li>
+            <li><b>Shotgun Upgrade:</b> more pellets (max 10).</li>
           </ul>
         </div>
       </div>
@@ -349,7 +351,7 @@
   });
 
   // Bullet & Grenade
-  Sprites.bullet = makeSprite(6,2,(s)=>{ s.fillStyle='#e8f5ff'; s.fillRect(0,0,6,2); });
+  Sprites.bullet = makeSprite(4,4,(s)=>{ s.fillStyle='#e8f5ff'; s.beginPath(); s.arc(2,2,2,0,Math.PI*2); s.fill(); });
   Sprites.grenade = makeSprite(8,8,(s)=>{
     s.fillStyle = '#8a6b2c'; s.fillRect(2,1,2,2);
     s.fillStyle = '#ffd36b'; s.fillRect(1,3,6,4);
@@ -937,18 +939,16 @@
   }
 
   Bullet.prototype.draw = function(ctx){
+    ctx.save();
+    ctx.fillStyle = this.color || '#e8f5ff';
     if (this.color) {
-      ctx.save();
-      ctx.fillStyle = this.color;
       ctx.shadowColor = this.color;
       ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI*2);
-      ctx.fill();
-      ctx.restore();
-    } else {
-      drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.375);
     }
+    ctx.beginPath();
+    ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
   };
   Missile.prototype.draw = function(ctx){ drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.5); };
 
@@ -958,6 +958,7 @@
   const score     = document.getElementById('score');
   const grenades  = document.getElementById('grenades');
   const machlvl   = document.getElementById('machlvl');
+  const shotlvl   = document.getElementById('shotlvl');
   const daybar    = document.getElementById('daybar');
   const timeleft  = document.getElementById('timeleft');
     const hpbar     = document.getElementById('hpbar');
@@ -970,6 +971,7 @@
     score.textContent = Math.floor(game.score);
     grenades.textContent = game.player.grenades;
     machlvl.textContent = game.player.machineLevel;
+    shotlvl.textContent = game.player.shotgunLevel;
       daybar.style.width = `${clamp(game.dayTimer / CONFIG.dayLength, 0, 1) * 100}%`;
       timeleft.textContent = game.bossAlive ? 'Boss!' : `${Math.max(0, Math.ceil(CONFIG.dayLength - game.dayTimer))}s`;
       hpbar.style.width = `${clamp(game.player.hp / game.player.maxHP, 0, 1) * 100}%`;
