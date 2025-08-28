@@ -41,6 +41,7 @@ class Player {
     }
     AudioBus.blip({});
   }
+  update(dt,game){ this.shootCD-=dt; if(this.machineLevel===10) this.shoot(game); }
 }
 
 class Game {
