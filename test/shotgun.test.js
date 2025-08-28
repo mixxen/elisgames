@@ -26,18 +26,19 @@ class Player {
     if(level===7){ front=7; back=5; }
     if(level>=8){ front=7; back=7; }
     const stun=level===10?1.5:0;
+    const bulletColor=level===10?'#ffff00':'#ffffff';
     const spread=0.18;
     for(let i=0;i<front;i++){
       const ang=this.aim.angle()+(i-(front-1)/2)*spread;
       const vel=Vec2.fromAngle(ang,baseSpeed);
-      game.spawnBullet(0,0,vel,this.bulletDamage,ang,{life,color:'#ffffff',stun});
+      game.spawnBullet(0,0,vel,this.bulletDamage,ang,{life,color:bulletColor,stun});
     }
     if(back>0){
       const base=this.aim.angle()+Math.PI;
       for(let i=0;i<back;i++){
         const ang=base+(i-(back-1)/2)*spread;
         const vel=Vec2.fromAngle(ang,baseSpeed);
-        game.spawnBullet(0,0,vel,this.bulletDamage,ang,{life,color:'#ffffff',stun});
+        game.spawnBullet(0,0,vel,this.bulletDamage,ang,{life,color:bulletColor,stun});
       }
     }
     AudioBus.blip({});
@@ -64,6 +65,7 @@ class Game{ constructor(){ this.bullets=[]; } spawnBullet(x,y,vel,dmg,ang,opts){
 
 // Level 10: stun on hit
 { const game=new Game(); const p=new Player(); p.shotgunLevel=10; p.shootShotgun(game);
-  assert.equal(game.bullets[0].opts.stun,1.5); }
+  assert.equal(game.bullets[0].opts.stun,1.5);
+  assert.equal(game.bullets[0].opts.color,'#ffff00'); }
 
 console.log('Shotgun tests passed');

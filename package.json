@@ -1,10 +1,10 @@
 {
   "name": "elisgames",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "type": "module",
   "scripts": {
-    "test": "node test/audio.test.js && node test/scenery.test.js && node test/raptor.test.js && node test/projectiles.test.js && node test/player.test.js && node test/shotgun.test.js && node test/grenade.test.js && node test/special.test.js && node test/special-kill.test.js && node test/special-boss.test.js && node test/crate-sprite.test.js && node test/meteor.test.js && node test/water-sprites.test.js && node test/background.test.js && node test/bullet-draw.test.js && node test/hud-shotgun.test.js",
-    "lint": "eslint audio.js scenery.js raptor.js projectiles.js special.js test/audio.test.js test/scenery.test.js test/raptor.test.js test/projectiles.test.js test/player.test.js test/shotgun.test.js test/grenade.test.js test/special.test.js test/special-kill.test.js test/special-boss.test.js test/crate-sprite.test.js test/meteor.test.js test/water-sprites.test.js test/background.test.js test/bullet-draw.test.js test/hud-shotgun.test.js"
+    "test": "node test/audio.test.js && node test/scenery.test.js && node test/raptor.test.js && node test/projectiles.test.js && node test/player.test.js && node test/shotgun.test.js && node test/grenade.test.js && node test/special.test.js && node test/special-kill.test.js && node test/special-boss.test.js && node test/crate-sprite.test.js && node test/meteor.test.js && node test/water-sprites.test.js && node test/background.test.js && node test/bullet-draw.test.js && node test/hud-shotgun.test.js && node test/missile.test.js",
+    "lint": "eslint audio.js scenery.js raptor.js projectiles.js special.js test/audio.test.js test/scenery.test.js test/raptor.test.js test/projectiles.test.js test/player.test.js test/shotgun.test.js test/grenade.test.js test/special.test.js test/special-kill.test.js test/special-boss.test.js test/crate-sprite.test.js test/meteor.test.js test/water-sprites.test.js test/background.test.js test/bullet-draw.test.js test/hud-shotgun.test.js test/missile.test.js"
   },
   "devDependencies": {
     "eslint": "^8.57.0"
