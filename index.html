@@ -601,6 +601,8 @@
         if (player.invuln<=0) {
           player.hp -= this.dmg; player.invuln = CONFIG.player.invuln;
           if (player.machineLevel > 1) { player.machineLevel--; showToast('Machine level lost', 'warn'); }
+            if (player.shotgunLevel > 0) { player.shotgunLevel--; showToast('Shotgun level lost', 'warn'); }
+            if (player.missileLevel > 0) { player.missileLevel--; showToast('Missile level lost', 'warn'); }
           AudioBus.boom({freq:120, dur:.09, vol:.18});
           for (let i=0;i<10;i++) game.particles.push(new Particle(player.pos.x, player.pos.y,
             Vec2.fromAngle(rand(0,Math.PI*2), rand(40,160)), .6, '#ff9b9b', 2));
