@@ -644,7 +644,7 @@
       this.nextEnvironment = null;
       this.transitionTimer = 0;
       this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, this.environment);
-      this.day = 1; this.dayTimer = 0; this.bossAlive = false;
+      this.day = 1; this.dayTimer = 0; this.bossAlive = false; this.boss = null;
       this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
       this.highScore = Number(localStorage.getItem('dino_highscore') || 0);
       this.kills = 0; this.score = 0;
@@ -724,13 +724,16 @@
       else if (side==='left'){ x=-m; y=rand(m, h-m); }
       else { x=w+m; y=rand(m, h-m); }
       const d = this.difficultyForDay(this.day), base = CONFIG.enemies.trex;
+      let boss;
       if (this.environment === 'water') {
-        this.enemies.push(new Mosasaurus(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+        boss = new Mosasaurus(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg));
         showToast(`Day ${this.day} Boss: Mosasaurus`, 'danger');
       } else {
-        this.enemies.push(new TRex(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg)));
+        boss = new TRex(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg));
         showToast(`Day ${this.day} Boss: T‑Rex`, 'danger');
       }
+      this.enemies.push(boss);
+      this.boss = boss;
       this.bossAlive = true; AudioBus.roar();
     }
 
@@ -817,22 +820,19 @@
         this.meteors = this.meteors.filter(e => e.alive);
 
       // Boss lifecycle
-      if (this.bossAlive) {
-        const boss = this.enemies.find(e => e.isBoss);
-        if (!boss) {
-          const prevEnv = this.environment;
-          this.bossAlive = false; this.day++; this.dayTimer = 0; this.player.healToFull();
-          const newEnv = Math.floor((this.day-1)/3)%2 === 0 ? 'land' : 'water';
-          if (newEnv !== prevEnv) {
-            this.nextEnvironment = newEnv;
-            this.environment = 'transition';
-            this.transitionTimer = canvas.clientWidth / CONFIG.scrollSpeed;
-          } else {
-            this.environment = newEnv;
-            this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, this.environment);
-          }
-          showToast(`Day ${this.day} begins — tougher foes ahead.`, 'ok'); AudioBus.blip({freq: 860, dur:.08, vol:.16});
+      if (this.bossAlive && (!this.boss || !this.boss.alive)) {
+        const prevEnv = this.environment;
+        this.bossAlive = false; this.boss = null; this.day++; this.dayTimer = 0; this.player.healToFull();
+        const newEnv = Math.floor((this.day-1)/3)%2 === 0 ? 'land' : 'water';
+        if (newEnv !== prevEnv) {
+          this.nextEnvironment = newEnv;
+          this.environment = 'transition';
+          this.transitionTimer = canvas.clientWidth / CONFIG.scrollSpeed;
+        } else {
+          this.environment = newEnv;
+          this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, this.environment);
         }
+        showToast(`Day ${this.day} begins — tougher foes ahead.`, 'ok'); AudioBus.blip({freq: 860, dur:.08, vol:.16});
       }
 
       this.score += dt * (2 * this.day);
@@ -841,8 +841,10 @@
 
     render(){
       const w = canvas.clientWidth, h = canvas.clientHeight;
-      canvas.style.background = backgroundForEnv(this.environment);
-      ctx.clearRect(0,0,w,h);
+      const bg = backgroundForEnv(this.environment);
+      if (canvas.style.background !== bg) canvas.style.background = bg;
+      ctx.fillStyle = bg;
+      ctx.fillRect(0,0,w,h);
       ctx.imageSmoothingEnabled = false;
 
       // subtle grid
@@ -861,7 +863,7 @@
         this.player.draw(ctx, this);
         for (const p of this.particles) p.draw(ctx, this);
 
-      const boss = this.enemies.find(e => e.isBoss);
+      const boss = this.boss;
       const bossRow = document.getElementById('bossRow');
       if (boss) {
         bossRow.style.display = '';
