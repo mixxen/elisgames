@@ -9,15 +9,19 @@ class Vec2 {
 }
 const CONFIG = { player:{ bulletSpeed:10, grenadeRadius:120, grenadeDamage:140 } };
 class Player{
-  constructor(){ this.pos=new Vec2(0,0); this.aim=new Vec2(1,0); this.radius=16; this.bulletDamage=10; this.missileLevel=1; this.missileCD=0; }
+  constructor(){ this.pos=new Vec2(0,0); this.aim=new Vec2(1,0); this.radius=16; this.bulletDamage=10; this.missileLevel=0; this.missileCD=0; }
   get missileCooldown(){ return [0,10,9,8,7,6,5,4,3,2,2][this.missileLevel]; }
-  shootMissile(game){ const vel=Vec2.fromAngle(0,CONFIG.player.bulletSpeed*0.9); const opts={missile:true}; if(this.missileLevel===10){ opts.explosive=true; opts.glow=true; } game.spawnBullet(0,0,vel,this.bulletDamage*2,0,opts); }
-  update(game,dt){ this.missileCD-=dt; if(this.missileCD<=0){ this.missileCD=this.missileCooldown; this.shootMissile(game); } }
+  shootMissile(game){ if(this.missileLevel<=0) return; const vel=Vec2.fromAngle(0,CONFIG.player.bulletSpeed*0.9); const opts={missile:true}; if(this.missileLevel===10){ opts.explosive=true; opts.glow=true; } game.spawnBullet(0,0,vel,this.bulletDamage*2,0,opts); }
+  update(game,dt){ this.missileCD-=dt; if(this.missileLevel>0 && this.missileCD<=0){ this.missileCD=this.missileCooldown; this.shootMissile(game); } }
 }
 class Game{ constructor(){ this.bullets=[]; } spawnBullet(x,y,vel,dmg,ang,opts){ this.bullets.push({vel,dmg,opts}); } }
 
 const game=new Game(); const p=new Player();
 p.update(game,0);
+assert.equal(game.bullets.length,0);
+assert.equal(p.missileCD,0);
+
+p.missileLevel=1; p.update(game,0);
 assert.equal(game.bullets.length,1);
 assert.equal(p.missileCD,10);
 

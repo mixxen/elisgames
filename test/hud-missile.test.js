@@ -4,9 +4,9 @@ import fs from 'node:fs';
 const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 assert.ok(
-  html.includes('Shotgun Lvl <b id="shotlvl">0</b>'),
-  'HUD should display shotgun level'
+  html.includes('Missile Lvl <b id="misslvl">0</b>'),
+  'HUD should display missile level',
 );
 
-console.log('HUD shotgun test passed');
+console.log('HUD missile test passed');
 

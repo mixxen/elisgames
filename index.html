@@ -79,7 +79,8 @@
       <span class="pill">Score <b id="score">0</b></span>
       <span class="pill">Grenades <b id="grenades">1</b></span>
       <span class="pill">Machine Lvl <b id="machlvl">1</b></span>
-      <span class="pill">Shotgun Lvl <b id="shotlvl">1</b></span>
+      <span class="pill">Shotgun Lvl <b id="shotlvl">0</b></span>
+      <span class="pill">Missile Lvl <b id="misslvl">0</b></span>
     </div>
     <div class="row" title="Time until boss">
       <div class="bar" style="width:260px"><i id="daybar"></i></div>
@@ -408,7 +409,7 @@
       super(x,y, CONFIG.player.radius);
       this.maxHP = CONFIG.player.maxHP; this.hp = this.maxHP;
       this.speed = CONFIG.player.speed; this.invuln = 0;
-      this.shootCD = 0; this.shotgunCD = 0; this.missileCD = 0; this.machineLevel = 1; this.shotgunLevel = 1; this.missileLevel = 1; this.grenades = 1;
+      this.shootCD = 0; this.shotgunCD = 0; this.missileCD = 0; this.machineLevel = 1; this.shotgunLevel = 0; this.missileLevel = 0; this.grenades = 1;
       this.aim = new Vec2(1,0); this.score = 0; this.kills = 0;
     }
     get fireRate(){
@@ -432,15 +433,15 @@
 
       // Shooting
       this.shootCD -= dt; this.shotgunCD -= dt; this.missileCD -= dt;
-      if (Input.mdown && this.shootCD <= 0) {
+      if (Input.mdown && this.shootCD <= 0 && this.machineLevel > 0) {
         this.shootCD = 1 / this.fireRate;
         this.shoot(game);
       }
-      if (Input.rdown && this.shotgunCD <= 0) {
+      if (Input.mdown && this.shotgunCD <= 0 && this.shotgunLevel > 0) {
         this.shotgunCD = 1 / this.shotgunFireRate;
         this.shootShotgun(game);
       }
-      if (this.missileCD <= 0) {
+      if (this.missileCD <= 0 && this.missileLevel > 0) {
         this.missileCD = this.missileCooldown;
         this.shootMissile(game);
       }
@@ -454,6 +455,7 @@
     }
     shoot(game){
       const level = this.machineLevel;
+      if (level <= 0) return;
       const baseSpeed = CONFIG.player.bulletSpeed;
       const speeds = { slow: baseSpeed*0.7, medium: baseSpeed, fast: baseSpeed*1.3 };
       const life = level === 1 ? 1.2 : 2.5;
@@ -476,6 +478,7 @@
     }
     shootShotgun(game){
       const level = this.shotgunLevel;
+      if (level <= 0) return;
       const baseSpeed = CONFIG.player.bulletSpeed*0.8;
       const life = level >= 9 ? 0.8 : 0.4;
       let front = 3, back = 0;
@@ -503,6 +506,7 @@
       AudioBus.blip({freq: 520, dur:.05, vol:.15});
     }
     shootMissile(game){
+      if (this.missileLevel <= 0) return;
       const vel = Vec2.fromAngle(this.aim.angle(), CONFIG.player.bulletSpeed*0.9);
       const opts = { missile:true };
       if (this.missileLevel === 10) { opts.explosive = true; opts.glow = true; }
@@ -983,7 +987,18 @@
       ctx.save(); ctx.globalAlpha = .6; ctx.fillStyle = '#00ff00';
       ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius+4, 0, Math.PI*2); ctx.fill(); ctx.restore();
     }
-    drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.5);
+    ctx.save();
+    ctx.translate(this.pos.x, this.pos.y);
+    ctx.rotate(this.ang);
+    ctx.fillStyle = '#e8f5ff';
+    ctx.beginPath();
+    ctx.moveTo(-this.radius, -this.radius/2);
+    ctx.lineTo(this.radius, -this.radius/2);
+    ctx.arc(this.radius, 0, this.radius/2, -Math.PI/2, Math.PI/2);
+    ctx.lineTo(-this.radius, this.radius/2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   };
 
   // HUD elements — DECLARE BEFORE new Game() is created
@@ -993,6 +1008,7 @@
   const grenades  = document.getElementById('grenades');
   const machlvl   = document.getElementById('machlvl');
   const shotlvl   = document.getElementById('shotlvl');
+  const misslvl   = document.getElementById('misslvl');
   const daybar    = document.getElementById('daybar');
   const timeleft  = document.getElementById('timeleft');
     const hpbar     = document.getElementById('hpbar');
@@ -1006,6 +1022,7 @@
     grenades.textContent = game.player.grenades;
     machlvl.textContent = game.player.machineLevel;
     shotlvl.textContent = game.player.shotgunLevel;
+    misslvl.textContent = game.player.missileLevel;
       daybar.style.width = `${clamp(game.dayTimer / CONFIG.dayLength, 0, 1) * 100}%`;
       timeleft.textContent = game.bossAlive ? 'Boss!' : `${Math.max(0, Math.ceil(CONFIG.dayLength - game.dayTimer))}s`;
       hpbar.style.width = `${clamp(game.player.hp / game.player.maxHP, 0, 1) * 100}%`;
