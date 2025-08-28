@@ -1,11 +1,13 @@
 export function createProjectileClasses(Entity, Vec2, Particle, rand = Math.random, canvas) {
   class Bullet extends Entity {
-    constructor(x, y, vel, dmg, ang, life = 1.2, radius = 4) {
+    constructor(x, y, vel, dmg, ang, life = 1.2, radius = 4, color = null, stun = 0) {
       super(x, y, radius);
       this.vel = vel;
       this.dmg = dmg;
       this.life = life;
       this.ang = ang || 0;
+      this.color = color;
+      this.stun = stun;
     }
     update(dt) {
       this.pos.add(this.vel.copy().scale(dt));

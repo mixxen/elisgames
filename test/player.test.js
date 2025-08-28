@@ -26,21 +26,18 @@ class Player {
     const life=level===1?1.2:2.5;
     let speed=speeds.slow;
     let bullets=1;
+    let dmg=this.bulletDamage;
+    let color=null;
     if(level===3||level===6) speed=speeds.medium;
-    if(level===4||level===7||level===9) speed=speeds.fast;
+    if(level===4||level===7||level>=9) speed=speeds.fast;
     if(level>=5&&level<=7) bullets=2;
-    if(level>=8&&level<=9) bullets=3;
-    if(level===10){
-      const ang=this.aim.angle();
-      const vel=Vec2.fromAngle(ang,speeds.fast);
-      game.spawnBullet(0,0,vel,this.bulletDamage,ang,{life, radius:8, laser:true});
-      return;
-    }
+    if(level>=8) bullets=3;
+    if(level===10){ dmg*=2; color='#ff3030'; }
     const spread=0.06;
     for(let i=0;i<bullets;i++){
       const ang=this.aim.angle()+(i-(bullets-1)/2)*spread;
       const vel=Vec2.fromAngle(ang,speed);
-      game.spawnBullet(0,0,vel,this.bulletDamage,ang,{life});
+      game.spawnBullet(0,0,vel,dmg,ang,{life,color});
     }
     AudioBus.blip({});
   }
@@ -53,36 +50,33 @@ class Game {
 }
 
 // Level 1: single slow shot
-{
-  const game=new Game(); const p=new Player(); p.machineLevel=1; p.shoot(game);
+{ const game=new Game(); const p=new Player(); p.machineLevel=1; p.shoot(game);
   assert.equal(game.bullets.length,1);
   assert.equal(game.bullets[0].vel.len(), CONFIG.player.bulletSpeed*0.7);
 }
 
 // Level 5: dual slow long-range shots
-{
-  const game=new Game(); const p=new Player(); p.machineLevel=5; p.shoot(game);
+{ const game=new Game(); const p=new Player(); p.machineLevel=5; p.shoot(game);
   assert.equal(game.bullets.length,2);
   assert.equal(game.bullets[0].vel.len(), CONFIG.player.bulletSpeed*0.7);
 }
 
 // Level 8: triple slow shots
-{
-  const game=new Game(); const p=new Player(); p.machineLevel=8; p.shoot(game);
+{ const game=new Game(); const p=new Player(); p.machineLevel=8; p.shoot(game);
   assert.equal(game.bullets.length,3);
 }
 
 // Level 9: triple fast shots
-{
-  const game=new Game(); const p=new Player(); p.machineLevel=9; p.shoot(game);
+{ const game=new Game(); const p=new Player(); p.machineLevel=9; p.shoot(game);
   assert.equal(game.bullets.length,3);
   assert.equal(game.bullets[0].vel.len(), CONFIG.player.bulletSpeed*1.3);
 }
 
-// Level 10: laser auto-fires
-{
-  const game=new Game(); const p=new Player(); p.machineLevel=10; p.update(0.1,game);
-  assert.equal(game.bullets[0].opts.laser, true);
+// Level 10: incendiary triple shots with double damage
+{ const game=new Game(); const p=new Player(); p.machineLevel=10; p.shoot(game);
+  assert.equal(game.bullets.length,3);
+  assert.equal(game.bullets[0].dmg,20);
+  assert.equal(game.bullets[0].opts.color,'#ff3030');
 }
 
 console.log('Player weapon tests passed');

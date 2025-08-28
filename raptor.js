@@ -8,6 +8,12 @@ export function createRaptorClass(Dino, Vec2, rand = Math.random) {
     }
 
     update(dt, game) {
+      if (this.stun > 0) {
+        this.stun -= dt;
+        this.vel.set(0, 0);
+        this.hitFlash = Math.max(0, this.hitFlash - dt);
+        return;
+      }
       if (this.pauseTimer > 0) {
         this.pauseTimer -= dt;
         if (this.pauseTimer < 0) this.pauseTimer = 0;
