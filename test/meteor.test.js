@@ -27,6 +27,6 @@ for(let i=0;i<5;i++) m.update(0.1, game);
 assert.ok(game.explodeCalled > 0);
 
 assert.equal(specialBarColor(10), 'linear-gradient(90deg, var(--accent), #9df3ff)');
-assert.equal(specialBarColor(20), 'linear-gradient(90deg, var(--accent-2), #b2ff9f)');
+assert.equal(specialBarColor(30), 'linear-gradient(90deg, var(--accent-2), #b2ff9f)');
 
 console.log('Meteor and special gauge tests passed');

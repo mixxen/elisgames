@@ -4,7 +4,7 @@ const Input = { special:false };
 let pulses = 0;
 class Game {
   constructor(){
-    this.specialCharge = 20;
+    this.specialCharge = 30;
     this.specialActive = false;
     this.specialTimer = 0;
     this.specialPulseTimer = 0;
@@ -13,7 +13,7 @@ class Game {
   update(dt){
     if (Input.special) {
       Input.special = false;
-      if (this.specialCharge >= 20 && !this.specialActive) {
+      if (this.specialCharge >= 30 && !this.specialActive) {
         this.specialActive = true; this.specialTimer = 5; this.specialPulseTimer = 0; this.specialCharge = 0;
       }
     }
