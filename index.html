@@ -189,7 +189,7 @@
       radius: 16, speed: 240, maxHP: 100, invuln: 0.7,
       baseFireRate: 4, baseBulletDamage: 15, bulletSpeed: 540,
       fireRatePerLevel: 1.0, dmgPerLevel: 5, maxMachineLevel: 10,
-      shotgunFireRate: 0.6, maxShotgunLevel: 10,
+      shotgunFireRate: 0.6, maxShotgunLevel: 10, maxMissileLevel: 10,
       grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420, missileCooldown: 5,
     },
     enemies: {
@@ -371,6 +371,11 @@
     s.strokeStyle='#203049'; s.lineWidth=2; s.strokeRect(1,1,12,12);
     s.fillStyle='#ff64d2'; s.fillRect(3,6,8,2); s.fillRect(8,4,3,6);
   });
+  Sprites.crateMiss = makeSprite(14,14,(s)=>{
+    s.fillStyle='#101824'; s.fillRect(0,0,14,14);
+    s.strokeStyle='#203049'; s.lineWidth=2; s.strokeRect(1,1,12,12);
+    s.fillStyle='#64ff64'; s.fillRect(3,6,8,2); s.fillRect(8,4,3,6);
+  });
 
   Sprites.grass = makeSprite(12,6,(s)=>{
     s.fillStyle='#1e5d2b'; s.fillRect(0,3,12,3);
@@ -403,7 +408,7 @@
       super(x,y, CONFIG.player.radius);
       this.maxHP = CONFIG.player.maxHP; this.hp = this.maxHP;
       this.speed = CONFIG.player.speed; this.invuln = 0;
-      this.shootCD = 0; this.shotgunCD = 0; this.machineLevel = 1; this.shotgunLevel = 1; this.missileLevel = 1; this.grenades = 1;
+      this.shootCD = 0; this.shotgunCD = 0; this.missileCD = 0; this.machineLevel = 1; this.shotgunLevel = 1; this.missileLevel = 1; this.grenades = 1;
       this.aim = new Vec2(1,0); this.score = 0; this.kills = 0;
     }
     get fireRate(){
@@ -411,6 +416,7 @@
     }
     get bulletDamage(){ return CONFIG.player.baseBulletDamage + (this.machineLevel-1)*CONFIG.player.dmgPerLevel; }
     get shotgunFireRate(){ return this.shotgunLevel===1 ? CONFIG.player.shotgunFireRate : CONFIG.player.shotgunFireRate*1.5; }
+    get missileCooldown(){ return [0,10,9,8,7,6,5,4,3,2,2][this.missileLevel]; }
     update(dt, game){
       const v = new Vec2(
         (Input.keys.has('a') || Input.keys.has('ArrowLeft')  ? -1 : 0) +
@@ -425,7 +431,7 @@
       this.aim.set(Input.mouse.x - this.pos.x, Input.mouse.y - this.pos.y).norm();
 
       // Shooting
-      this.shootCD -= dt; this.shotgunCD -= dt;
+      this.shootCD -= dt; this.shotgunCD -= dt; this.missileCD -= dt;
       if (Input.mdown && this.shootCD <= 0) {
         this.shootCD = 1 / this.fireRate;
         this.shoot(game);
@@ -433,6 +439,10 @@
       if (Input.rdown && this.shotgunCD <= 0) {
         this.shotgunCD = 1 / this.shotgunFireRate;
         this.shootShotgun(game);
+      }
+      if (this.missileCD <= 0) {
+        this.missileCD = this.missileCooldown;
+        this.shootMissile(game);
       }
 
       // Grenade
@@ -475,21 +485,29 @@
       if (level === 7) { front = 7; back = 5; }
       if (level >= 8) { front = 7; back = 7; }
       const stun = level === 10 ? 1.5 : 0;
+      const bulletColor = level === 10 ? '#ffff00' : '#ffffff';
       const spread = 0.18;
       for (let i=0;i<front;i++){
         const ang = this.aim.angle() + (i-(front-1)/2)*spread;
         const vel = Vec2.fromAngle(ang, baseSpeed);
-        game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, this.bulletDamage, ang, {life, color:'#ffffff', stun});
+        game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, this.bulletDamage, ang, {life, color:bulletColor, stun});
       }
       if (back > 0){
         const base = this.aim.angle()+Math.PI;
         for (let i=0;i<back;i++){
           const ang = base + (i-(back-1)/2)*spread;
           const vel = Vec2.fromAngle(ang, baseSpeed);
-          game.spawnBullet(this.pos.x - this.aim.x*this.radius, this.pos.y - this.aim.y*this.radius, vel, this.bulletDamage, ang, {life, color:'#ffffff', stun});
+          game.spawnBullet(this.pos.x - this.aim.x*this.radius, this.pos.y - this.aim.y*this.radius, vel, this.bulletDamage, ang, {life, color:bulletColor, stun});
         }
       }
       AudioBus.blip({freq: 520, dur:.05, vol:.15});
+    }
+    shootMissile(game){
+      const vel = Vec2.fromAngle(this.aim.angle(), CONFIG.player.bulletSpeed*0.9);
+      const opts = { missile:true };
+      if (this.missileLevel === 10) { opts.explosive = true; opts.glow = true; }
+      game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, this.bulletDamage*2, this.aim.angle(), opts);
+      AudioBus.blip({freq: 300, dur:.08, vol:.2});
     }
     throwGrenade(game){
       this.grenades--;
@@ -553,14 +571,15 @@
              else { player.grenades++; showToast('Max machine! +1 grenade','ok'); } }
       else if (this.type==='shotgun'){ if (player.shotgunLevel < CONFIG.player.maxShotgunLevel) { player.shotgunLevel++; showToast(`Shotgun upgraded → Lv.${player.shotgunLevel}`, 'ok'); }
              else { player.grenades++; showToast('Max shotgun! +1 grenade','ok'); } }
-      else if (this.type==='missile'){ /* placeholder */ }
+      else if (this.type==='missile'){ if (player.missileLevel < CONFIG.player.maxMissileLevel) { player.missileLevel++; showToast(`Missiles upgraded → Lv.${player.missileLevel}`, 'ok'); }
+             else { player.grenades++; showToast('Max missiles! +1 grenade','ok'); } }
     }
     update(dt){ this.pulse += dt*2.2; }
     draw(ctx){
       const glow = (Math.sin(this.pulse)*0.5 + 0.5)*6 + 8;
-      ctx.save(); ctx.globalAlpha = .18; ctx.fillStyle = this.type==='grenade' ? '#ffe59a' : this.type==='shotgun' ? '#ffa8e2' : '#a8d5ff';
+      ctx.save(); ctx.globalAlpha = .18; ctx.fillStyle = this.type==='grenade' ? '#ffe59a' : this.type==='shotgun' ? '#ffa8e2' : this.type==='missile' ? '#a8ffa8' : '#a8d5ff';
       ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius+glow, 0, Math.PI*2); ctx.fill(); ctx.restore();
-      drawSprite(this.type==='grenade'?Sprites.crateGren:this.type==='shotgun'?Sprites.crateShot:Sprites.crateGun, this.pos.x, this.pos.y, 0, 1.6);
+      drawSprite(this.type==='grenade'?Sprites.crateGren:this.type==='shotgun'?Sprites.crateShot:this.type==='missile'?Sprites.crateMiss:Sprites.crateGun, this.pos.x, this.pos.y, 0, 1.6);
     }
   }
 
@@ -734,12 +753,16 @@
     }
     dropSupply(x,y){
       const r = Math.random();
-      const type = r < 0.45 ? 'grenade' : r < 0.75 ? 'machine' : 'shotgun';
+      const type = r < 0.35 ? 'grenade' : r < 0.6 ? 'machine' : r < 0.85 ? 'shotgun' : 'missile';
       this.supplies.push(new Supply(x,y,type));
     }
     spawnBullet(x,y, vel, dmg, ang, opts={}){
-      if (opts.missile) this.bullets.push(new Missile(x,y, vel, dmg, ang));
-      else this.bullets.push(new Bullet(x,y, vel, dmg, ang, opts.life, opts.radius, opts.color, opts.stun));
+      if (opts.missile) {
+        const m = new Missile(x,y, vel, dmg, ang);
+        if (opts.glow) m.glow = true;
+        if (opts.explosive) m.explosive = true;
+        this.bullets.push(m);
+      } else this.bullets.push(new Bullet(x,y, vel, dmg, ang, opts.life, opts.radius, opts.color, opts.stun));
     }
 
     difficultyForDay(day){
@@ -852,6 +875,11 @@
         for (const e of this.enemies) {
           if (!e.alive) continue;
           if (circleHit(b, e)) {
+            if (b.explosive) {
+              b.alive = false;
+              this.explode(b.pos.x, b.pos.y, CONFIG.player.grenadeRadius, CONFIG.player.grenadeDamage);
+              break;
+            }
             b.alive = false; e.damage(b.dmg);
             if (b.stun) e.stun = Math.max(e.stun, b.stun);
             this.particles.push(new Particle(b.pos.x, b.pos.y, Vec2.fromAngle(b.vel.angle(), 120), .3, '#fff', 1.6));
@@ -950,7 +978,13 @@
     ctx.fill();
     ctx.restore();
   };
-  Missile.prototype.draw = function(ctx){ drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.5); };
+  Missile.prototype.draw = function(ctx){
+    if (this.glow) {
+      ctx.save(); ctx.globalAlpha = .6; ctx.fillStyle = '#00ff00';
+      ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius+4, 0, Math.PI*2); ctx.fill(); ctx.restore();
+    }
+    drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.5);
+  };
 
   // HUD elements — DECLARE BEFORE new Game() is created
   const day       = document.getElementById('day');
