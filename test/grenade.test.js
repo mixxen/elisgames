@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 
-const Input = { gdown:false, rdown:false };
+const Input = { gdown:false };
 let thrown = 0;
 class Player {
   constructor(){ this.grenades = 2; }
   update(){
-    if (Input.rdown || Input.gdown) {
-      Input.rdown = false; Input.gdown = false;
+    if (Input.gdown) {
+      Input.gdown = false;
       if (this.grenades > 0) { this.grenades--; thrown++; }
     }
   }

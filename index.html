@@ -78,7 +78,7 @@
       <span class="pill">Kills <b id="kills">0</b></span>
       <span class="pill">Score <b id="score">0</b></span>
       <span class="pill">Grenades <b id="grenades">1</b></span>
-      <span class="pill">Gun Lvl <b id="gunlvl">1</b></span>
+      <span class="pill">Machine Lvl <b id="machlvl">1</b></span>
     </div>
     <div class="row" title="Time until boss">
       <div class="bar" style="width:260px"><i id="daybar"></i></div>
@@ -186,8 +186,8 @@
     player: {
       radius: 16, speed: 240, maxHP: 100, invuln: 0.7,
       baseFireRate: 4, baseBulletDamage: 15, bulletSpeed: 540,
-      fireRatePerLevel: 1.0, dmgPerLevel: 5, maxGunLevel: 9,
-      shotgunFireRate: 0.6,
+      fireRatePerLevel: 1.0, dmgPerLevel: 5, maxMachineLevel: 10,
+      shotgunFireRate: 0.6, maxShotgunLevel: 10,
       grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420, missileCooldown: 5,
     },
     enemies: {
@@ -396,15 +396,14 @@
       super(x,y, CONFIG.player.radius);
       this.maxHP = CONFIG.player.maxHP; this.hp = this.maxHP;
       this.speed = CONFIG.player.speed; this.invuln = 0;
-      this.shootCD = 0; this.gunLevel = 1; this.grenades = 1; this.missileCooldown = 0;
+      this.shootCD = 0; this.shotgunCD = 0; this.machineLevel = 1; this.shotgunLevel = 1; this.missileLevel = 1; this.grenades = 1;
       this.aim = new Vec2(1,0); this.score = 0; this.kills = 0;
     }
     get fireRate(){
-      let rate = CONFIG.player.baseFireRate + (this.gunLevel-1)*CONFIG.player.fireRatePerLevel;
-      if (this.gunLevel >= 4) rate *= CONFIG.player.shotgunFireRate;
-      return rate;
+      return CONFIG.player.baseFireRate + (this.machineLevel-1)*CONFIG.player.fireRatePerLevel;
     }
-    get bulletDamage(){ return CONFIG.player.baseBulletDamage + (this.gunLevel-1)*CONFIG.player.dmgPerLevel; }
+    get bulletDamage(){ return CONFIG.player.baseBulletDamage + (this.machineLevel-1)*CONFIG.player.dmgPerLevel; }
+    get shotgunFireRate(){ return this.shotgunLevel===1 ? CONFIG.player.shotgunFireRate : CONFIG.player.shotgunFireRate*1.5; }
     update(dt, game){
       const v = new Vec2(
         (Input.keys.has('a') || Input.keys.has('ArrowLeft')  ? -1 : 0) +
@@ -419,48 +418,71 @@
       this.aim.set(Input.mouse.x - this.pos.x, Input.mouse.y - this.pos.y).norm();
 
       // Shooting
-      this.shootCD -= dt;
+      this.shootCD -= dt; this.shotgunCD -= dt;
       if (Input.mdown && this.shootCD <= 0) {
         this.shootCD = 1 / this.fireRate;
         this.shoot(game);
       }
+      if (Input.rdown && this.shotgunCD <= 0) {
+        this.shotgunCD = 1 / this.shotgunFireRate;
+        this.shootShotgun(game);
+      }
 
       // Grenade
-      if (Input.rdown || Input.gdown) {
-        Input.rdown = false; Input.gdown = false;
+      if (Input.gdown) {
+        Input.gdown = false;
         if (this.grenades > 0) this.throwGrenade(game); else showToast('No grenades!', 'warn');
       }
       if (this.invuln > 0) this.invuln -= dt;
-      if (this.missileCooldown > 0) this.missileCooldown -= dt;
     }
     shoot(game){
-      const spd = CONFIG.player.bulletSpeed, d = this.bulletDamage;
-      const spread = Math.min(.18, .02 * (this.gunLevel-1));
-      const baseBullets = this.gunLevel >= 4 ? 2 : 1;
-      for (let i=0;i<baseBullets;i++){
-        const ang = this.aim.angle() + rand(-spread, spread);
-        const vel = Vec2.fromAngle(ang, spd);
-        game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang);
-      }
-      if (this.gunLevel >= 4) {
-        const pelletCounts = [3,5,7];
-        const pellets = pelletCounts[Math.min(this.gunLevel, 6) - 4];
-        for (let i=0;i<pellets;i++){
-          const ang = this.aim.angle() + rand(-0.5, 0.5);
-          const vel = Vec2.fromAngle(ang, spd * 0.5);
-          game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, d, ang, {life:0.35, radius:6});
-        }
-      }
-      if (this.gunLevel >= 7 && this.missileCooldown <= 0) {
-        const missiles = Math.min(3, this.gunLevel - 6);
-        for (let i=0;i<missiles;i++){
-          const ang = this.aim.angle();
-          const vel = Vec2.fromAngle(ang, spd * 0.8);
-          game.spawnBullet(this.pos.x - this.aim.x*this.radius, this.pos.y - this.aim.y*this.radius, vel, d * 2, ang, {missile:true});
-        }
-        this.missileCooldown = CONFIG.player.missileCooldown;
+      const level = this.machineLevel;
+      const baseSpeed = CONFIG.player.bulletSpeed;
+      const speeds = { slow: baseSpeed*0.7, medium: baseSpeed, fast: baseSpeed*1.3 };
+      const life = level === 1 ? 1.2 : 2.5;
+      let speed = speeds.slow;
+      let bullets = 1;
+      let dmg = this.bulletDamage;
+      let color = null;
+      if (level === 3 || level === 6) speed = speeds.medium;
+      if (level === 4 || level === 7 || level >= 9) speed = speeds.fast;
+      if (level >= 5 && level <= 7) bullets = 2;
+      if (level >= 8) bullets = 3;
+      if (level === 10) { dmg *= 2; color = '#ff3030'; }
+      const spread = 0.06;
+      for (let i=0;i<bullets;i++){
+        const ang = this.aim.angle() + (i-(bullets-1)/2)*spread;
+        const vel = Vec2.fromAngle(ang, speed);
+        game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, dmg, ang, {life, color});
       }
       AudioBus.blip({freq: 720, dur:.03, vol:.12});
+    }
+    shootShotgun(game){
+      const level = this.shotgunLevel;
+      const baseSpeed = CONFIG.player.bulletSpeed*0.8;
+      const life = level >= 9 ? 0.8 : 0.4;
+      let front = 3, back = 0;
+      if (level === 4) { front = 5; }
+      if (level === 5) { front = 7; }
+      if (level === 6) { front = 7; back = 3; }
+      if (level === 7) { front = 7; back = 5; }
+      if (level >= 8) { front = 7; back = 7; }
+      const stun = level === 10 ? 1.5 : 0;
+      const spread = 0.18;
+      for (let i=0;i<front;i++){
+        const ang = this.aim.angle() + (i-(front-1)/2)*spread;
+        const vel = Vec2.fromAngle(ang, baseSpeed);
+        game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, this.bulletDamage, ang, {life, color:'#ffffff', stun});
+      }
+      if (back > 0){
+        const base = this.aim.angle()+Math.PI;
+        for (let i=0;i<back;i++){
+          const ang = base + (i-(back-1)/2)*spread;
+          const vel = Vec2.fromAngle(ang, baseSpeed);
+          game.spawnBullet(this.pos.x - this.aim.x*this.radius, this.pos.y - this.aim.y*this.radius, vel, this.bulletDamage, ang, {life, color:'#ffffff', stun});
+        }
+      }
+      AudioBus.blip({freq: 520, dur:.05, vol:.15});
     }
     throwGrenade(game){
       this.grenades--;
@@ -520,8 +542,11 @@
     constructor(x,y,type){ super(x,y, 14); this.type=type; this.pulse=0; }
     apply(player){
       if (this.type==='grenade'){ const n=randi(1,2); player.grenades+=n; showToast(`+${n} grenade${n>1?'s':''}`); }
-      else { if (player.gunLevel < CONFIG.player.maxGunLevel) { player.gunLevel++; showToast(`Gun upgraded → Lv.${player.gunLevel}`, 'ok'); }
-             else { player.grenades++; showToast('Max gun! +1 grenade','ok'); } }
+      else if (this.type==='machine'){ if (player.machineLevel < CONFIG.player.maxMachineLevel) { player.machineLevel++; showToast(`Machine upgraded → Lv.${player.machineLevel}`, 'ok'); }
+             else { player.grenades++; showToast('Max machine! +1 grenade','ok'); } }
+      else if (this.type==='shotgun'){ if (player.shotgunLevel < CONFIG.player.maxShotgunLevel) { player.shotgunLevel++; showToast(`Shotgun upgraded → Lv.${player.shotgunLevel}`, 'ok'); }
+             else { player.grenades++; showToast('Max shotgun! +1 grenade','ok'); } }
+      else if (this.type==='missile'){ /* placeholder */ }
     }
     update(dt){ this.pulse += dt*2.2; }
     draw(ctx){
@@ -533,7 +558,11 @@
   }
 
   class Dino extends Entity {
-    constructor(x,y,r,speed,hp,dmg){ super(x,y,r); this.speed=speed; this.hp=hp; this.dmg=dmg; this.hitCD=0; this.hitFlash=0; }
+    constructor(x,y,r,speed,hp,dmg){
+      super(x,y,r);
+      this.speed=speed; this.hp=hp; this.dmg=dmg;
+      this.hitCD=0; this.hitFlash=0; this.stun=0;
+    }
     damage(d){ this.hp -= d; this.hitFlash = .12; if (this.hp <= 0) this.alive = false; }
     hitPlayer(game, player, dt){
       if (this.hitCD>0) this.hitCD -= dt;
@@ -541,7 +570,7 @@
       if (d < this.radius + player.radius) {
         if (player.invuln<=0) {
           player.hp -= this.dmg; player.invuln = CONFIG.player.invuln;
-          if (player.gunLevel > 1) { player.gunLevel--; showToast('Gun level lost', 'warn'); }
+          if (player.machineLevel > 1) { player.machineLevel--; showToast('Machine level lost', 'warn'); }
           AudioBus.boom({freq:120, dur:.09, vol:.18});
           for (let i=0;i<10;i++) game.particles.push(new Particle(player.pos.x, player.pos.y,
             Vec2.fromAngle(rand(0,Math.PI*2), rand(40,160)), .6, '#ff9b9b', 2));
@@ -575,6 +604,12 @@
   class Pterodactyl extends Dino {
     constructor(x,y, speed, hp, dmg){ super(x,y, CONFIG.enemies.ptero.radius, speed, hp, dmg); this.phase = rand(0, Math.PI*2); }
     update(dt, game){
+      if (this.stun > 0) {
+        this.stun -= dt;
+        this.vel.set(0,0);
+        this.hitFlash = Math.max(0, this.hitFlash - dt);
+        return;
+      }
       const dir = game.player.pos.copy().sub(this.pos).norm();
       const perp = new Vec2(-dir.y, dir.x).scale(Math.sin(game.time*2.1 + this.phase) * 0.6);
       const v = dir.add(perp).norm().scale(this.speed);
@@ -596,6 +631,12 @@
     constructor(x,y, speed, hp, dmg){ super(x,y, CONFIG.enemies.trex.radius, speed, hp, dmg);
       this.isBoss = true; this.chargeCD = rand(...CONFIG.enemies.trex.chargeEvery); this.charging = 0; }
     update(dt, game){
+      if (this.stun > 0) {
+        this.stun -= dt;
+        this.vel.set(0,0);
+        this.hitFlash = Math.max(0, this.hitFlash - dt);
+        return;
+      }
       this.chargeCD -= dt;
       if (this.chargeCD <= 0 && this.charging <= 0) { this.charging = 1.2; this.chargeCD = rand(...CONFIG.enemies.trex.chargeEvery); }
       const dir = game.player.pos.copy().sub(this.pos).norm();
@@ -657,16 +698,16 @@
       showOverlay(`Game Over — Day ${this.day}`, `<p>You scored <b>${Math.floor(this.score)}</b> with <b>${this.kills}</b> dinos downed.</p><p>Press <span class="key">R</span> to try again.</p>`);
       AudioBus.boom({freq:60, dur:.3, vol:.3});
     }
-    explode(x,y, radius, damage){
+    explode(x,y, radius, damage, count=true){
       for (const e of this.enemies) {
         const d = dist({x,y}, e.pos);
-        if (d < radius + e.radius) { e.damage(damage); if (!e.alive) this.onKill(e); }
+        if (d < radius + e.radius) { e.damage(damage); if (!e.alive) this.onKill(e, !count); }
       }
       for (let i=0;i<38;i++) this.particles.push(new Particle(x,y, Vec2.fromAngle(rand(0,Math.PI*2), rand(80,320)), .8, '#ffd36b', 2));
     }
-    onKill(e){
+    onKill(e, fromSpecial=false){
       this.kills++; this.score += 10 * (e.isBoss ? 30 : 1) * this.day;
-      this.specialCharge = Math.min(20, this.specialCharge + 1);
+      if (!fromSpecial) this.specialCharge = Math.min(20, this.specialCharge + 1);
       if (!e.isBoss && Math.random()<0.08) this.dropSupply(e.pos.x, e.pos.y);
       const color = e.isBoss ? '#ffd0d0' : (e instanceof Pterodactyl ? '#9de0ff' : '#6fe27e');
       for (let i=0;i<14;i++) this.particles.push(new Particle(e.pos.x, e.pos.y,
@@ -677,15 +718,19 @@
         for (let i=0;i<5;i++) this.meteors.push(new Meteor(rand(0, w)));
         const x=this.player.pos.x, y=this.player.pos.y;
         for (const e of this.enemies) {
-          if (!e.alive) continue; e.damage(9999); if (!e.alive) this.onKill(e);
+          if (!e.alive) continue; e.damage(9999); if (!e.alive) this.onKill(e, true);
         }
       for (let i=0;i<36;i++) this.particles.push(new Particle(x,y, Vec2.fromAngle(i/36*Math.PI*2, 280), .4, '#ff7bff', 2));
       AudioBus.boom({freq:120, dur:.2, vol:.3});
     }
-    dropSupply(x,y){ const type = Math.random() < 0.55 ? 'grenade' : 'gun'; this.supplies.push(new Supply(x,y,type)); }
+    dropSupply(x,y){
+      const r = Math.random();
+      const type = r < 0.45 ? 'grenade' : r < 0.75 ? 'machine' : 'shotgun';
+      this.supplies.push(new Supply(x,y,type));
+    }
     spawnBullet(x,y, vel, dmg, ang, opts={}){
       if (opts.missile) this.bullets.push(new Missile(x,y, vel, dmg, ang));
-      else this.bullets.push(new Bullet(x,y, vel, dmg, ang, opts.life, opts.radius));
+      else this.bullets.push(new Bullet(x,y, vel, dmg, ang, opts.life, opts.radius, opts.color, opts.stun));
     }
 
     difficultyForDay(day){
@@ -799,6 +844,7 @@
           if (!e.alive) continue;
           if (circleHit(b, e)) {
             b.alive = false; e.damage(b.dmg);
+            if (b.stun) e.stun = Math.max(e.stun, b.stun);
             this.particles.push(new Particle(b.pos.x, b.pos.y, Vec2.fromAngle(b.vel.angle(), 120), .3, '#fff', 1.6));
             if (!e.alive) this.onKill(e); else e.pos.add(b.vel.copy().norm().scale(6));
             break;
@@ -883,7 +929,20 @@
     ctx.imageSmoothingEnabled = false; ctx.drawImage(img, -img.width/2, -img.height/2); ctx.restore();
   }
 
-  Bullet.prototype.draw = function(ctx){ drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.375); };
+  Bullet.prototype.draw = function(ctx){
+    if (this.color) {
+      ctx.save();
+      ctx.fillStyle = this.color;
+      ctx.shadowColor = this.color;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(this.pos.x, this.pos.y, this.radius, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.375);
+    }
+  };
   Missile.prototype.draw = function(ctx){ drawSprite(Sprites.bullet, this.pos.x, this.pos.y, this.ang, this.radius*0.5); };
 
   // HUD elements — DECLARE BEFORE new Game() is created
@@ -891,7 +950,7 @@
   const kills     = document.getElementById('kills');
   const score     = document.getElementById('score');
   const grenades  = document.getElementById('grenades');
-  const gunlvl    = document.getElementById('gunlvl');
+  const machlvl   = document.getElementById('machlvl');
   const daybar    = document.getElementById('daybar');
   const timeleft  = document.getElementById('timeleft');
     const hpbar     = document.getElementById('hpbar');
@@ -903,7 +962,7 @@
     kills.textContent = game.kills;
     score.textContent = Math.floor(game.score);
     grenades.textContent = game.player.grenades;
-    gunlvl.textContent = game.player.gunLevel;
+    machlvl.textContent = game.player.machineLevel;
       daybar.style.width = `${clamp(game.dayTimer / CONFIG.dayLength, 0, 1) * 100}%`;
       timeleft.textContent = game.bossAlive ? 'Boss!' : `${Math.max(0, Math.ceil(CONFIG.dayLength - game.dayTimer))}s`;
       hpbar.style.width = `${clamp(game.player.hp / game.player.maxHP, 0, 1) * 100}%`;

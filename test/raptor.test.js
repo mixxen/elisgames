@@ -27,6 +27,7 @@ class Dino {
     this.hp = hp;
     this.dmg = dmg;
     this.hitFlash = 0;
+    this.stun = 0;
   }
   hitPlayer() {}
 }
