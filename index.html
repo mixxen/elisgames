@@ -507,9 +507,11 @@
     }
     shootMissile(game){
       if (this.missileLevel <= 0) return;
-      const vel = Vec2.fromAngle(this.aim.angle(), CONFIG.player.bulletSpeed*0.9);
+      const level = this.missileLevel;
+      const speed = CONFIG.player.bulletSpeed * (0.9 + 0.03 * (level - 1));
+      const vel = Vec2.fromAngle(this.aim.angle(), speed);
       const opts = { missile:true };
-      if (this.missileLevel === 10) { opts.explosive = true; opts.glow = true; }
+      if (level === 10) { opts.explosive = true; opts.glow = true; }
       game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, this.bulletDamage*2, this.aim.angle(), opts);
       AudioBus.blip({freq: 300, dur:.08, vol:.2});
     }
@@ -771,10 +773,20 @@
       } else this.bullets.push(new Bullet(x,y, vel, dmg, ang, opts.life, opts.radius, opts.color, opts.stun));
     }
 
-    difficultyForDay(day){
+    difficultyForDay(day, isBoss=false){
       const m = CONFIG.difficultyPerDay, n = day - 1;
-      return { hp: Math.pow(m.hp, n), speed: Math.pow(m.speed, n), dmg: Math.pow(m.dmg, n),
-               spawnInterval: CONFIG.baseSpawnInterval / Math.pow(m.spawnRate, n) };
+      const scale = {
+        hp: Math.pow(m.hp, n),
+        speed: Math.pow(m.speed, n),
+        dmg: Math.pow(m.dmg, n),
+        spawnInterval: CONFIG.baseSpawnInterval / Math.pow(m.spawnRate, n)
+      };
+      if (isBoss) {
+        const bossFactor = Math.pow(1.2, n);
+        scale.hp *= bossFactor;
+        scale.dmg *= bossFactor;
+      }
+      return scale;
     }
 
     spawnEnemy(){
@@ -806,7 +818,7 @@
       else if (side==='bottom'){ x=rand(m, w-m); y=h+m; }
       else if (side==='left'){ x=-m; y=rand(m, h-m); }
       else { x=w+m; y=rand(m, h-m); }
-      const d = this.difficultyForDay(this.day), base = CONFIG.enemies.trex;
+      const d = this.difficultyForDay(this.day, true), base = CONFIG.enemies.trex;
       let boss;
       if (this.environment === 'water') {
         boss = new Mosasaurus(x,y, rand(...base.speed)*d.speed, Math.ceil(base.hp*d.hp), Math.ceil(base.dmg*d.dmg));
@@ -985,14 +997,10 @@
     ctx.restore();
   };
   Missile.prototype.draw = function(ctx){
-    if (this.glow) {
-      ctx.save(); ctx.globalAlpha = .6; ctx.fillStyle = '#00ff00';
-      ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius+4, 0, Math.PI*2); ctx.fill(); ctx.restore();
-    }
     ctx.save();
     ctx.translate(this.pos.x, this.pos.y);
     ctx.rotate(this.ang);
-    ctx.fillStyle = '#e8f5ff';
+    ctx.fillStyle = this.glow ? '#00ff00' : '#e8f5ff';
     ctx.beginPath();
     ctx.moveTo(-this.radius, -this.radius/2);
     ctx.lineTo(this.radius, -this.radius/2);

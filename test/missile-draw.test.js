@@ -8,14 +8,10 @@ class Missile {
     this.glow = false;
   }
   draw(ctx) {
-    if (this.glow) {
-      ctx.save(); ctx.globalAlpha = .6; ctx.fillStyle = '#00ff00';
-      ctx.beginPath(); ctx.arc(this.pos.x, this.pos.y, this.radius + 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    }
     ctx.save();
     ctx.translate(this.pos.x, this.pos.y);
     ctx.rotate(this.ang);
-    ctx.fillStyle = '#e8f5ff';
+    ctx.fillStyle = this.glow ? '#00ff00' : '#e8f5ff';
     ctx.beginPath();
     ctx.moveTo(-this.radius, -this.radius / 2);
     ctx.lineTo(this.radius, -this.radius / 2);
@@ -60,6 +56,31 @@ assert.deepEqual(calls, [
   'fill',
   'restore'
 ]);
+
+const calls2 = [];
+const ctx2 = {
+  save() { calls2.push('save'); },
+  restore() { calls2.push('restore'); },
+  translate(x, y) { calls2.push(['translate', x, y]); },
+  rotate(a) { calls2.push(['rotate', a]); },
+  beginPath() { calls2.push('beginPath'); },
+  moveTo(x, y) { calls2.push(['moveTo', x, y]); },
+  lineTo(x, y) { calls2.push(['lineTo', x, y]); },
+  arc(x, y, r, a0, a1) { calls2.push(['arc', x, y, r, a0, a1]); },
+  closePath() { calls2.push('closePath'); },
+  fill() { calls2.push('fill'); },
+  set fillStyle(v) { calls2.push(['fillStyle', v]); },
+  get fillStyle() { return calls2.find(c => c[0] === 'fillStyle')?.[1]; }
+};
+
+const m2 = new Missile(5, 5);
+m2.glow = true;
+m2.draw(ctx2);
+
+assert.equal(calls2[3][1], '#00ff00');
+const arcCalls = calls2.filter(c => Array.isArray(c) && c[0] === 'arc');
+assert.equal(arcCalls.length, 1);
+assert.equal(arcCalls[0][3], 3);
 
 console.log('Missile draw test passed');
 
