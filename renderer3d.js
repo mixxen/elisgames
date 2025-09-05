@@ -15,6 +15,32 @@ export class Renderer3D {
     this.scene.add(light);
     this.objects = new Map();
     this.textureCache = new Map();
+
+    this.addBlock = (id, x, y, color = 0xffffff, size = 20) => {
+      const geometry = new THREE.BoxGeometry(size, size, size);
+      const material = new THREE.MeshLambertMaterial({ color });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, -y, 0);
+      this.scene.add(mesh);
+      this.objects.set(id, mesh);
+      return mesh;
+    };
+
+    this.addSprite = (id, image, x, y, angle = 0, scale = 1) => {
+      let texture = this.textureCache.get(image);
+      if (!texture) {
+        texture = new THREE.CanvasTexture(image);
+        this.textureCache.set(image, texture);
+      }
+      const geometry = new THREE.PlaneGeometry(image.width * scale, image.height * scale);
+      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, -y, 0);
+      mesh.rotation.z = -angle;
+      this.scene.add(mesh);
+      this.objects.set(id, mesh);
+      return mesh;
+    };
   }
 
   setSize(w, h) {
@@ -40,35 +66,11 @@ export class Renderer3D {
     this.objects.clear();
   }
 
-  addBlock(id, x, y, color = 0xffffff, size = 20) {
-    const geometry = new THREE.BoxGeometry(size, size, size);
-    const material = new THREE.MeshLambertMaterial({ color });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, -y, 0);
-    this.scene.add(mesh);
-    this.objects.set(id, mesh);
-    return mesh;
-  }
-
-  addSprite(id, image, x, y, angle = 0, scale = 1) {
-    let texture = this.textureCache.get(image);
-    if (!texture) {
-      texture = new THREE.CanvasTexture(image);
-      this.textureCache.set(image, texture);
-    }
-    const geometry = new THREE.PlaneGeometry(image.width * scale, image.height * scale);
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, -y, 0);
-    mesh.rotation.z = -angle;
-    this.scene.add(mesh);
-    this.objects.set(id, mesh);
-    return mesh;
-  }
-
   render() {
     if (this.renderer) {
       this.renderer.render(this.scene, this.camera);
     }
   }
 }
+
+export default Renderer3D;
