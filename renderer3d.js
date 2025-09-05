@@ -14,6 +14,7 @@ export class Renderer3D {
     light.position.set(0, 0, 1);
     this.scene.add(light);
     this.objects = new Map();
+    this.textureCache = new Map();
   }
 
   setSize(w, h) {
@@ -30,6 +31,11 @@ export class Renderer3D {
   clear() {
     for (const mesh of this.objects.values()) {
       this.scene.remove(mesh);
+      if (mesh.geometry) mesh.geometry.dispose();
+      if (mesh.material) {
+        if (mesh.material.map) mesh.material.map.dispose();
+        mesh.material.dispose();
+      }
     }
     this.objects.clear();
   }
@@ -39,6 +45,22 @@ export class Renderer3D {
     const material = new THREE.MeshLambertMaterial({ color });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, -y, 0);
+    this.scene.add(mesh);
+    this.objects.set(id, mesh);
+    return mesh;
+  }
+
+  addSprite(id, image, x, y, angle = 0, scale = 1) {
+    let texture = this.textureCache.get(image);
+    if (!texture) {
+      texture = new THREE.CanvasTexture(image);
+      this.textureCache.set(image, texture);
+    }
+    const geometry = new THREE.PlaneGeometry(image.width * scale, image.height * scale);
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, -y, 0);
+    mesh.rotation.z = -angle;
     this.scene.add(mesh);
     this.objects.set(id, mesh);
     return mesh;
