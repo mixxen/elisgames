@@ -1,6 +1,6 @@
 {
   "name": "elisgames",
-  "version": "1.14.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "test": "node test/audio.test.js && node test/scenery.test.js && node test/raptor.test.js && node test/projectiles.test.js && node test/player.test.js && node test/shotgun.test.js && node test/grenade.test.js && node test/special.test.js && node test/special-kill.test.js && node test/special-boss.test.js && node test/crate-sprite.test.js && node test/meteor.test.js && node test/water-sprites.test.js && node test/background.test.js && node test/bullet-draw.test.js && node test/hud-shotgun.test.js && node test/hud-missile.test.js && node test/missile-draw.test.js && node test/shotgun-fire.test.js && node test/missile.test.js && node test/player-hit.test.js && node test/boss-difficulty.test.js && node test/renderer3d.test.js && node test/renderer3d-cache.test.js && node test/renderer3d-dispose.test.js && node test/mouse-scale.test.js && node test/start-button.test.js",
