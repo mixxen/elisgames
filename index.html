@@ -254,7 +254,7 @@
   window.addEventListener('mouseup',   (e) => { if (e.button===0) Input.mdown = false; if (e.button===2) Input.rdown = false; });
   canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
-    Input.mouse.set(e.clientX - rect.left, e.clientY - rect.top);
+    Input.mouse.set((e.clientX - rect.left) * DPR, (e.clientY - rect.top) * DPR);
   });
 
   // -------------------------
@@ -433,7 +433,7 @@
         (Input.keys.has('s') || Input.keys.has('ArrowDown')  ?  1 : 0)
       ); if (v.x||v.y) v.norm().scale(this.speed);
       this.vel = v; this.pos.add(this.vel.copy().scale(dt));
-      const w = canvas.clientWidth, h = canvas.clientHeight;
+      const w = canvas.width, h = canvas.height;
       this.pos.x = clamp(this.pos.x, this.radius, w - this.radius);
       this.pos.y = clamp(this.pos.y, this.radius, h - this.radius);
       this.aim.set(Input.mouse.x - this.pos.x, Input.mouse.y - this.pos.y).norm();
@@ -720,12 +720,12 @@
     constructor(){ this.reset(); }
     reset(){
       this.time = 0; this.state = 'menu';
-      this.player = new Player(canvas.clientWidth*0.5, canvas.clientHeight*0.6);
+      this.player = new Player(canvas.width*0.5, canvas.height*0.6);
         this.bullets = []; this.enemies = []; this.grenades = []; this.supplies = []; this.particles = []; this.meteors = [];
       this.environment = 'land';
       this.nextEnvironment = null;
       this.transitionTimer = 0;
-      this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, this.environment);
+      this.scenery = generateScenery(40, canvas.width, canvas.height, this.environment);
       this.day = 1; this.dayTimer = 0; this.bossAlive = false; this.boss = null;
       this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
       this.highScore = Number(localStorage.getItem('dino_highscore') || 0);
@@ -755,7 +755,7 @@
         Vec2.fromAngle(rand(0,Math.PI*2), rand(60,200)), .7, color, 2));
     }
       laserBlast(){
-        const w = canvas.clientWidth;
+        const w = canvas.width;
         for (let i=0;i<5;i++) this.meteors.push(new Meteor(rand(0, w)));
         const x=this.player.pos.x, y=this.player.pos.y;
         for (const e of this.enemies) {
@@ -797,7 +797,7 @@
     }
 
     spawnEnemy(){
-      const w = canvas.clientWidth, h = canvas.clientHeight, m = CONFIG.worldMargin;
+      const w = canvas.width, h = canvas.height, m = CONFIG.worldMargin;
       const edge = choice(['top','bottom','left','right']); let x,y;
       if (edge==='top'){ x=rand(-m, w+m); y=-m; }
       else if (edge==='bottom'){ x=rand(-m, w+m); y=h+m; }
@@ -819,7 +819,7 @@
     }
 
     spawnBoss(){
-      const w = canvas.clientWidth, h = canvas.clientHeight, m = CONFIG.worldMargin;
+      const w = canvas.width, h = canvas.height, m = CONFIG.worldMargin;
       const side = choice(['top','bottom','left','right']); let x,y;
       if (side==='top'){ x=rand(m, w-m); y=-m; }
       else if (side==='bottom'){ x=rand(m, w-m); y=h+m; }
@@ -858,8 +858,8 @@
       if (this.supplyCD <= 0) {
         this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
         const ang = rand(0, Math.PI*2), r = rand(120, 280);
-        const px = clamp(this.player.pos.x + Math.cos(ang)*r, 24, canvas.clientWidth-24);
-        const py = clamp(this.player.pos.y + Math.sin(ang)*r, 24, canvas.clientHeight-24);
+        const px = clamp(this.player.pos.x + Math.cos(ang)*r, 24, canvas.width-24);
+        const py = clamp(this.player.pos.y + Math.sin(ang)*r, 24, canvas.height-24);
         this.dropSupply(px, py);
       }
 
@@ -885,7 +885,7 @@
       for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles, this.meteors]) {
         for (const e of arr) e.pos.x -= scroll;
       }
-      scrollScenery(this.scenery, canvas.clientWidth, canvas.clientHeight, CONFIG.scrollSpeed, dt, Math.random, this.environment);
+      scrollScenery(this.scenery, canvas.width, canvas.height, CONFIG.scrollSpeed, dt, Math.random, this.environment);
       if (this.environment === 'transition') {
         this.transitionTimer -= dt;
         if (this.transitionTimer <= 0) {
@@ -935,10 +935,10 @@
         if (newEnv !== prevEnv) {
           this.nextEnvironment = newEnv;
           this.environment = 'transition';
-          this.transitionTimer = canvas.clientWidth / CONFIG.scrollSpeed;
+          this.transitionTimer = canvas.width / CONFIG.scrollSpeed;
         } else {
           this.environment = newEnv;
-          this.scenery = generateScenery(40, canvas.clientWidth, canvas.clientHeight, this.environment);
+          this.scenery = generateScenery(40, canvas.width, canvas.height, this.environment);
         }
         showToast(`Day ${this.day} begins — tougher foes ahead.`, 'ok'); AudioBus.blip({freq: 860, dur:.08, vol:.16});
       }
@@ -948,7 +948,7 @@
     }
 
     render(){
-      const w = canvas.clientWidth, h = canvas.clientHeight;
+      const w = canvas.width, h = canvas.height;
       const bg = backgroundForEnv(this.environment);
       if (renderer3D.renderer) renderer3D.renderer.setClearColor(bg);
       renderer3D.clear();
@@ -1118,8 +1118,8 @@
   window.addEventListener('blur', () => { if (game.state==='running') togglePause(); });
 
   window.addEventListener('resize', () => {
-    game.player.pos.x = Math.max(game.player.radius, Math.min(canvas.clientWidth - game.player.radius, game.player.pos.x));
-    game.player.pos.y = Math.max(game.player.radius, Math.min(canvas.clientHeight - game.player.radius, game.player.pos.y));
+    game.player.pos.x = Math.max(game.player.radius, Math.min(canvas.width - game.player.radius, game.player.pos.x));
+    game.player.pos.y = Math.max(game.player.radius, Math.min(canvas.height - game.player.radius, game.player.pos.y));
   });
   </script>
 </body>

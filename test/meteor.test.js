@@ -19,7 +19,7 @@ class Particle extends Entity {
 }
 
 const rand = (a,b)=> (a+b)/2;
-const Meteor = createMeteorClass(Entity, Vec2, Particle, rand, {clientHeight:100});
+const Meteor = createMeteorClass(Entity, Vec2, Particle, rand, {height:100});
 
 const game = { explodeCalled:0, explode(){ this.explodeCalled++; }, particles:[] };
 const m = new Meteor(50);

@@ -22,7 +22,7 @@ class Particle extends Entity { constructor(x,y, vel, life, color, size){ super(
 function makeRand(values){ let i=0; return ()=>values[i++]; }
 
 // Prepare classes
-const canvas = { clientWidth:100, clientHeight:100 };
+const canvas = { width:100, height:100 };
 const { Bullet, Missile } = createProjectileClasses(Entity, Vec2, Particle, makeRand([0.5,0.5,0.5]), canvas);
 
 // Bullet respects custom radius and life
