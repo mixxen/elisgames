@@ -14,7 +14,7 @@ export class Renderer3D {
     light.position.set(0, 0, 1);
     this.scene.add(light);
     this.objects = new Map();
-    this.textureCache = new Map();
+    this.textureCache = new WeakMap();
     this.blockGeoCache = new Map();
     this.blockMatCache = new Map();
 
@@ -31,6 +31,7 @@ export class Renderer3D {
       }
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(x, -y, 0);
+      mesh.isBlock = true;
       this.scene.add(mesh);
       this.objects.set(id, mesh);
       return mesh;
@@ -67,6 +68,10 @@ export class Renderer3D {
   clear() {
     for (const mesh of this.objects.values()) {
       this.scene.remove(mesh);
+      if (!mesh.isBlock) {
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+      }
     }
     this.objects.clear();
   }
