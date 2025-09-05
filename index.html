@@ -363,6 +363,7 @@
     s.fillStyle = '#8a6b2c'; s.fillRect(2,1,2,2);
     s.fillStyle = '#ffd36b'; s.fillRect(1,3,6,4);
   });
+  Sprites.meteor = makeSprite(24,24,(s)=>{ s.fillStyle='#ff944d'; s.beginPath(); s.arc(12,12,12,0,Math.PI*2); s.fill(); });
   Sprites.crateGren = makeSprite(14,14,(s)=>{
     s.fillStyle='#101824'; s.fillRect(0,0,14,14);
     s.strokeStyle='#203049'; s.lineWidth=2; s.strokeRect(1,1,12,12);
@@ -951,14 +952,42 @@
       const bg = backgroundForEnv(this.environment);
       if (renderer3D.renderer) renderer3D.renderer.setClearColor(bg);
       renderer3D.clear();
-      this.scenery.forEach((d,i)=>renderer3D.addBlock(`scenery${i}`, d.x, d.y, 0x228B22, 20));
-      this.supplies.forEach((s,i)=>renderer3D.addBlock(`supply${i}`, s.pos.x, s.pos.y, 0xffff00, 20));
-      this.grenades.forEach((gr,i)=>renderer3D.addBlock(`grenade${i}`, gr.pos.x, gr.pos.y, 0xffaa00, gr.radius*2));
-      this.bullets.forEach((b,i)=>renderer3D.addBlock(`bullet${i}`, b.pos.x, b.pos.y, b.color?Number(b.color.replace('#','0x')):0xe8f5ff, b.radius*2));
-      this.enemies.forEach((e,i)=>renderer3D.addBlock(`enemy${i}`, e.pos.x, e.pos.y, 0xff0000, e.radius*2));
-      this.meteors.forEach((m,i)=>renderer3D.addBlock(`meteor${i}`, m.pos.x, m.pos.y, 0xff944d, m.radius*2));
-      this.player && renderer3D.addBlock('player', this.player.pos.x, this.player.pos.y, 0x00ff00, this.player.radius*2);
+
+      this.scenery.forEach((d,i)=>{
+        const sprite = Sprites[d.type];
+        if (sprite) renderer3D.addSprite(`scenery${i}`, sprite, d.x, d.y);
+      });
+
+      this.supplies.forEach((s,i)=>{
+        const sprite = s.type==='grenade'?Sprites.crateGren:s.type==='shotgun'?Sprites.crateShot:s.type==='missile'?Sprites.crateMiss:Sprites.crateGun;
+        renderer3D.addSprite(`supply${i}`, sprite, s.pos.x, s.pos.y, 0, 1.6);
+      });
+
+      this.grenades.forEach((gr,i)=>renderer3D.addSprite(`grenade${i}`, Sprites.grenade, gr.pos.x, gr.pos.y, 0, 1.6));
+
+      this.bullets.forEach((b,i)=>{
+        const ang = b.ang || (b.vel && b.vel.angle ? b.vel.angle() : 0);
+        renderer3D.addSprite(`bullet${i}`, Sprites.bullet, b.pos.x, b.pos.y, ang, b.radius/2);
+      });
+
+      this.enemies.forEach((e,i)=>{
+        let sprite, scale, ang = e.vel.angle();
+        if (e instanceof Raptor) { sprite = Sprites.raptor; scale = e.radius/12; }
+        else if (e instanceof WaterDino) { sprite = Sprites.waterdino; scale = e.radius/12; }
+        else if (e instanceof Pterodactyl) { sprite = Sprites.ptero; scale = e.radius/12; }
+        else if (e instanceof Mosasaurus) { sprite = Sprites.mosasaurus; scale = e.radius/24; }
+        else if (e instanceof TRex) { sprite = Sprites.trex; scale = e.radius/24; }
+        if (sprite) renderer3D.addSprite(`enemy${i}`, sprite, e.pos.x, e.pos.y, ang, scale);
+      });
+
+      this.meteors.forEach((m,i)=>renderer3D.addSprite(`meteor${i}`, Sprites.meteor, m.pos.x, m.pos.y, 0, m.radius/12));
+
+      if (this.player) {
+        renderer3D.addSprite('player', Sprites.player, this.player.pos.x, this.player.pos.y, this.player.aim.angle(), this.player.radius/12);
+      }
+
       this.particles.forEach((p,i)=>renderer3D.addBlock(`particle${i}`, p.pos.x, p.pos.y, 0xffffff, p.radius*2));
+
       renderer3D.render();
 
       const boss = this.boss;
