@@ -3,7 +3,7 @@ import * as THREE from 'three';
 export class Renderer3D {
   constructor(canvas) {
     this.scene = new THREE.Scene();
-    this.camera = new THREE.OrthographicCamera(0, 1, 0, -1, -1000, 1000);
+    this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
     this.camera.position.z = 500;
     if (typeof window !== 'undefined' && canvas) {
       this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
@@ -43,11 +43,13 @@ export class Renderer3D {
         texture = new THREE.CanvasTexture(image);
         this.textureCache.set(image, texture);
       }
-      const geometry = new THREE.PlaneGeometry(image.width * scale, image.height * scale);
+      const w = image.width * scale;
+      const h = image.height * scale;
+      const geometry = new THREE.BoxGeometry(w, h, w / 10);
       const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(x, -y, 0);
-      mesh.rotation.z = -angle;
+      mesh.rotation.y = -angle;
       this.scene.add(mesh);
       this.objects.set(id, mesh);
       return mesh;
@@ -58,11 +60,12 @@ export class Renderer3D {
     if (this.renderer) {
       this.renderer.setSize(w, h, false);
     }
-    this.camera.right = w;
-    this.camera.left = 0;
-    this.camera.top = 0;
-    this.camera.bottom = -h;
+    this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.camera.position.set(w / 2, -h / 2, 500);
+    this.camera.lookAt(w / 2, -h / 2, 0);
+    this.camera.rotateX(-0.6);
+    this.camera.rotateZ(Math.PI / 4);
   }
 
   clear() {
@@ -70,7 +73,11 @@ export class Renderer3D {
       this.scene.remove(mesh);
       if (!mesh.isBlock) {
         mesh.geometry.dispose();
-        mesh.material.dispose();
+        if (Array.isArray(mesh.material)) {
+          for (const m of mesh.material) m.dispose();
+        } else {
+          mesh.material.dispose();
+        }
       }
     }
     this.objects.clear();
