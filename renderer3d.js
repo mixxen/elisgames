@@ -15,10 +15,20 @@ export class Renderer3D {
     this.scene.add(light);
     this.objects = new Map();
     this.textureCache = new Map();
+    this.blockGeoCache = new Map();
+    this.blockMatCache = new Map();
 
     this.addBlock = (id, x, y, color = 0xffffff, size = 20) => {
-      const geometry = new THREE.BoxGeometry(size, size, size);
-      const material = new THREE.MeshLambertMaterial({ color });
+      let geometry = this.blockGeoCache.get(size);
+      if (!geometry) {
+        geometry = new THREE.BoxGeometry(size, size, size);
+        this.blockGeoCache.set(size, geometry);
+      }
+      let material = this.blockMatCache.get(color);
+      if (!material) {
+        material = new THREE.MeshLambertMaterial({ color });
+        this.blockMatCache.set(color, material);
+      }
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(x, -y, 0);
       this.scene.add(mesh);
@@ -57,11 +67,6 @@ export class Renderer3D {
   clear() {
     for (const mesh of this.objects.values()) {
       this.scene.remove(mesh);
-      if (mesh.geometry) mesh.geometry.dispose();
-      if (mesh.material) {
-        if (mesh.material.map) mesh.material.map.dispose();
-        mesh.material.dispose();
-      }
     }
     this.objects.clear();
   }

@@ -23,7 +23,7 @@ export function createMeteorClass(Entity, Vec2, Particle, rand = Math.random, ca
           2
         )
       );
-      if (this.pos.y >= canvas.clientHeight - 20) {
+      if (this.pos.y >= canvas.height - 20) {
         this.alive = false;
         game.explode(this.pos.x, this.pos.y, 80, 9999, false);
       }

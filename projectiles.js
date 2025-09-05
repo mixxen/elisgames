@@ -14,7 +14,7 @@ export function createProjectileClasses(Entity, Vec2, Particle, rand = Math.rand
       this.life -= dt;
       if (this.life <= 0) this.alive = false;
       if (canvas) {
-        const w = canvas.clientWidth, h = canvas.clientHeight;
+        const w = canvas.width, h = canvas.height;
         if (this.pos.x < -20 || this.pos.y < -20 || this.pos.x > w + 20 || this.pos.y > h + 20) {
           this.alive = false;
         }
