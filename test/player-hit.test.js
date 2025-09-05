@@ -31,8 +31,10 @@ class Dino {
     this.dmg=1;
   }
   hitPlayer(game, player){
-    const d=Math.hypot(this.pos.x-player.pos.x,this.pos.y-player.pos.y);
-    if(d < this.radius+player.radius){
+    const collide = Math.abs(this.pos.x-player.pos.x) < this.radius+player.radius &&
+                    Math.abs(this.pos.y-player.pos.y) < this.radius+player.radius &&
+                    Math.abs((this.z||0)-(player.z||0)) < this.radius+player.radius;
+    if(collide){
       if(player.invuln<=0){
         player.hp -= this.dmg; player.invuln = CONFIG.player.invuln;
         if(player.machineLevel > 1){ player.machineLevel--; showToast('Machine level lost','warn'); }

@@ -22,6 +22,12 @@ const spriteMesh = r.addSprite('sprite', sprite, 5, 5, Math.PI / 4, 2);
 assert(spriteMesh.geometry instanceof THREE.BoxGeometry, 'sprite geometry');
 assert(Math.abs(spriteMesh.rotation.y + Math.PI / 4) < 1e-6, 'sprite rotation');
 assert(spriteMesh.material.map.image === sprite, 'sprite texture');
+assert(spriteMesh.geometry.parameters.depth === sprite.width, 'sprite depth');
 assert(r.scene.children.includes(spriteMesh), 'sprite added to scene');
+
+const sphereMesh = r.addSphere('s', 0, 0, 5, 0xff00ff);
+assert(sphereMesh.geometry instanceof THREE.SphereGeometry, 'sphere geometry');
+assert(sphereMesh.material.color.getHex() === 0xff00ff, 'sphere color');
+assert(r.scene.children.includes(sphereMesh), 'sphere added to scene');
 
 console.log('renderer3d test passed');

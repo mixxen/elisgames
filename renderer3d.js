@@ -17,6 +17,7 @@ export class Renderer3D {
     this.textureCache = new WeakMap();
     this.blockGeoCache = new Map();
     this.blockMatCache = new Map();
+    this.sphereGeoCache = new Map();
 
     this.addBlock = (id, x, y, color = 0xffffff, size = 20) => {
       let geometry = this.blockGeoCache.get(size);
@@ -45,11 +46,29 @@ export class Renderer3D {
       }
       const w = image.width * scale;
       const h = image.height * scale;
-      const geometry = new THREE.BoxGeometry(w, h, w / 10);
+      const geometry = new THREE.BoxGeometry(w, h, w / 2);
       const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(x, -y, 0);
       mesh.rotation.y = -angle;
+      this.scene.add(mesh);
+      this.objects.set(id, mesh);
+      return mesh;
+    };
+
+    this.addSphere = (id, x, y, radius = 4, color = 0xe8f5ff) => {
+      let geometry = this.sphereGeoCache.get(radius);
+      if (!geometry) {
+        geometry = new THREE.SphereGeometry(radius, 16, 16);
+        this.sphereGeoCache.set(radius, geometry);
+      }
+      let material = this.blockMatCache.get(color);
+      if (!material) {
+        material = new THREE.MeshLambertMaterial({ color });
+        this.blockMatCache.set(color, material);
+      }
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, -y, 0);
       this.scene.add(mesh);
       this.objects.set(id, mesh);
       return mesh;
@@ -64,7 +83,7 @@ export class Renderer3D {
     this.camera.updateProjectionMatrix();
     this.camera.position.set(w / 2, -h / 2, 500);
     this.camera.lookAt(w / 2, -h / 2, 0);
-    this.camera.rotateX(-0.6);
+    this.camera.rotateX(0.6);
     this.camera.rotateZ(Math.PI / 4);
   }
 
