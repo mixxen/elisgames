@@ -23,7 +23,8 @@
       font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial;
       overflow: hidden;
     }
-    #game { display: block; width: 100vw; height: 100vh; background: #002b11; cursor: crosshair; }
+    #game { display: block; width: 100vw; height: 100vh; background: #000000; cursor: crosshair; }
+    /* 3D fog implemented with translucent blocks in the scene */
     .hud {
       position: fixed; left: 12px; top: 12px; user-select: none; pointer-events: none;
       background: linear-gradient(180deg, rgba(18,23,34,.9), rgba(12,15,20,.8));
@@ -111,7 +112,6 @@
       <span class="badge"><span class="key">L‑Click</span> Shoot</span>
       <span class="badge"><span class="key">G</span>/<span class="key">R‑Click</span> Grenade</span>
       <span class="badge"><span class="key">P</span> Pause</span>
-      <span class="badge"><span class="key">F</span> Fullscreen</span>
     </div>
   </div>
 
@@ -140,7 +140,7 @@
       <div class="cta-row">
         <button id="btnStart" class="cta">▶ Start</button>
         <button id="btnMute" class="cta" title="Mute/Unmute (M)">🔈 Mute</button>
-        <button id="btnFS" class="cta" title="Fullscreen (F)">⛶ Fullscreen</button>
+        <button id="btnFS" class="cta" title="Fullscreen">⛶ Fullscreen</button>
       </div>
       <p class="footnote" style="margin-top:8px">Tip: Right‑click throws a grenade. High score is saved locally.</p>
     </div>
@@ -149,7 +149,7 @@
   <div id="toast"></div>
 
   <script type="module">
-    import { Scenery, generateScenery, scrollScenery, backgroundForEnv } from './scenery.js';
+    import { Scenery, generateScenery, scrollScenery } from './scenery.js';
     import { createRaptorClass } from './raptor.js';
     import { createProjectileClasses } from './projectiles.js';
     import { createMeteorClass, specialBarColor } from './special.js';
@@ -203,10 +203,19 @@
 
   function groundTypeForEnv(env, col, row) {
     const noise = hashNoise(GROUND_SEED, col, row);
-    if (env === 'land') return noise < 0.08 ? 'sand' : 'grass';
-    if (env === 'water') return noise < 0.18 ? 'sand' : 'water';
-    if (env === 'transition') return noise < 0.33 ? 'grass' : noise < 0.66 ? 'sand' : 'water';
-    return 'grass';
+    switch (env) {
+      case 'forest':
+      case 'land':
+        return noise < 0.08 ? 'sand' : 'grass';
+      case 'sand':
+        return 'sand';
+      case 'water':
+        return 'water';
+      case 'transition':
+        return noise < 0.33 ? 'grass' : noise < 0.66 ? 'sand' : 'water';
+      default:
+        return 'grass';
+    }
   }
 
   function createGroundTiles(env, width, height, startCol = -1, resolver = groundTypeForEnv) {
@@ -265,6 +274,10 @@
     difficultyPerDay: { hp: 1.18, speed: 1.10, dmg: 1.12, spawnRate: 1.14 },
   };
 
+  const SCENE_SEQUENCE = ['forest', 'sand', 'water', 'sand'];
+  const SCENE_DURATION = 60;
+  const FOREST_TREE_PROB = 0.22;
+
   const TREE_COLLISION_RADIUS = 36;
 
   // -------------------------
@@ -314,7 +327,6 @@
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
     Input.keys.add(k);
     if (k==='p') togglePause();
-    if (k==='f') toggleFullscreen();
     if (k==='m') toggleMute();
     if (k==='g' && !e.repeat) Input.gdown = true;
     if (k==='r' && !e.repeat) {
@@ -329,7 +341,7 @@
   });
   canvas.addEventListener('mousedown', (e) => {
     if (e.button===0) Input.mdown = true;
-    if (e.button===2) Input.rdown = true;
+    if (e.button===2) { Input.rdown = true; Input.gdown = true; }
     updateMouseFromClient(e.clientX, e.clientY);
   });
   window.addEventListener('mouseup',   (e) => { if (e.button===0) Input.mdown = false; if (e.button===2) Input.rdown = false; });
@@ -1092,14 +1104,12 @@
       this.time = 0; this.state = 'menu';
       this.player = new Player(canvas.width*0.5, canvas.height*0.6);
         this.bullets = []; this.enemies = []; this.grenades = []; this.supplies = []; this.particles = []; this.meteors = [];
-      this.environment = 'land';
-      this.nextEnvironment = null;
-      this.transitionTimer = 0;
-      this.scenery = generateScenery(40, canvas.width, canvas.height, this.environment);
+      this.sceneIndex = 0;
+      this.sceneTimer = 0;
+      this.environment = SCENE_SEQUENCE[this.sceneIndex];
+      this.scenery = [];
       this.groundBaseEnv = this.environment;
       this.nextGroundEnv = null;
-      this.beachTimer = 0;
-      this.postWaterSandTimer = 0;
       this.groundColumnStart = -1;
       this.groundGrid = createGroundTiles(this.groundBaseEnv, canvas.width, canvas.height, this.groundColumnStart, this.groundTileType.bind(this));
       this.nextGroundGrid = null;
@@ -1107,6 +1117,12 @@
       this.groundBlendDuration = Math.max(1, canvas.width / CONFIG.scrollSpeed);
       this.groundScrollX = 0;
       renderer3D.updateGround(this.groundGrid, null, 0, this.groundScrollX);
+      if (this.environment === 'forest') {
+        this.seedForestTreesFromGrid(this.groundGrid);
+      } else {
+        this.scenery = generateScenery(40, canvas.width, canvas.height, this.environment);
+      }
+      // No water bubble effect in simplified water mode
       this.day = 1; this.dayTimer = 0; this.bossAlive = false; this.boss = null;
       this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
       this.highScore = Number(localStorage.getItem('dino_highscore') || 0);
@@ -1165,69 +1181,52 @@
         const worldRow = grid.startRow + r;
         const colIndex = grid.cols - 1;
         const type = this.groundTileType(env, newWorldCol, worldRow);
-        rowTiles.push({
-          colIndex,
-          rowIndex: r,
-          worldCol: newWorldCol,
-          worldRow,
-          type
-        });
+        const newTile = { colIndex, rowIndex: r, worldCol: newWorldCol, worldRow, type };
+        rowTiles.push(newTile);
+        this.maybeAddForestTreeForTile(newTile);
       }
     }
     groundTileType(env, worldCol, worldRow){
-      if (env === 'transition') {
-        if (this.nextEnvironment === 'water') {
-          return this.beachTimer < 30 ? 'sand' : 'water';
-        }
-        if (this.nextEnvironment === 'land') {
-          return 'sand';
-        }
-      }
-      if (env === 'water') {
-        return 'water';
-      }
-      if (env === 'land') {
-        if (this.postWaterSandTimer > 0) return 'sand';
-        return groundTypeForEnv(env, worldCol, worldRow);
-      }
       return groundTypeForEnv(env, worldCol, worldRow);
     }
-    prepareGroundTransition(nextEnv){
-      this.nextGroundEnv = nextEnv;
-      if (nextEnv === 'water' || nextEnv === 'land') this.beachTimer = 0;
-      if (this.environment === 'water' && nextEnv === 'land') this.postWaterSandTimer = 30;
-      if (nextEnv === 'water') this.postWaterSandTimer = 0;
-      this.nextGroundGrid = createGroundTiles(nextEnv, canvas.width, canvas.height, this.groundColumnStart, this.groundTileType.bind(this));
-      this.groundBlend = 0;
-      this.groundBlendDuration = Math.max(1, canvas.width / CONFIG.scrollSpeed);
-    }
+    prepareGroundTransition(nextEnv){ /* no-op (no-fade mode) */ }
     updateGroundBlend(dt){
-      if (this.environment === 'transition') this.beachTimer += dt;
-      if (this.postWaterSandTimer > 0) this.postWaterSandTimer = Math.max(0, this.postWaterSandTimer - dt);
-      if (this.nextGroundGrid) {
-        this.groundBlend = Math.min(1, this.groundBlend + dt / this.groundBlendDuration);
-        renderer3D.updateGround(this.groundGrid, this.nextGroundGrid, this.groundBlend, this.groundScrollX);
-      } else if (this.groundGrid) {
-        renderer3D.updateGround(this.groundGrid, null, 0, this.groundScrollX);
+      renderer3D.updateGround(this.groundGrid, null, 0, this.groundScrollX);
+    }
+    seedForestTreesFromGrid(grid){
+      if (!grid) return;
+      for (const row of grid.tiles) {
+        for (const tile of row) {
+          this.maybeAddForestTreeForTile(tile, true);
+        }
       }
     }
-    finalizeGroundTransition(){
-      if (this.nextGroundGrid) {
-        this.groundGrid = this.nextGroundGrid;
-        this.nextGroundGrid = null;
-        this.groundBlend = 0;
-        if (this.nextGroundEnv) this.groundBaseEnv = this.nextGroundEnv;
-        this.nextGroundEnv = null;
-        this.groundColumnStart = this.groundGrid.startCol;
-        renderer3D.updateGround(this.groundGrid, null, 0, this.groundScrollX);
-      }
+    maybeAddForestTreeForTile(tile, initial=false){
+      if (this.groundGrid?.env !== 'forest') return;
+      if (tile.type !== 'grass') return;
+      if (Math.random() >= FOREST_TREE_PROB) return;
+      const offset = this.groundScrollX || 0;
+      const tx = tile.colIndex * GROUND_TILE_SIZE + GROUND_TILE_SIZE / 2 - offset;
+      const ty = tile.rowIndex * GROUND_TILE_SIZE + GROUND_TILE_SIZE / 2;
+      const t = choice(['tree_oak', 'tree_pine', 'tree_birch']);
+      this.scenery.push(new Scenery(tx, ty, t));
     }
+    advanceScene(){
+      this.sceneIndex = (this.sceneIndex + 1) % SCENE_SEQUENCE.length;
+      const nextEnv = SCENE_SEQUENCE[this.sceneIndex];
+      this.environment = nextEnv;
+      this.groundGrid.env = nextEnv;
+      this.groundBaseEnv = nextEnv;
+      // Do not wipe scenery; let existing items scroll out naturally.
+    }
+    finalizeGroundTransition(){ /* no-op (no-fade mode) */ }
     handleResize(width, height){
       this.groundGrid = createGroundTiles(this.groundBaseEnv || this.environment, width, height, this.groundColumnStart, this.groundTileType.bind(this));
-      if (this.nextGroundEnv) {
-        this.nextGroundGrid = createGroundTiles(this.nextGroundEnv, width, height, this.groundColumnStart, this.groundTileType.bind(this));
+      renderer3D.updateGround(this.groundGrid, null, 0, this.groundScrollX);
+      if (this.environment === 'forest') {
+        this.scenery = [];
+        this.seedForestTreesFromGrid(this.groundGrid);
       }
-      renderer3D.updateGround(this.groundGrid, this.nextGroundGrid, this.nextGroundGrid ? this.groundBlend : 0, this.groundScrollX);
     }
     spawnBullet(x,y, vel, dmg, ang, opts={}){
       if (opts.missile) {
@@ -1301,6 +1300,11 @@
       if (this.state !== 'running') return;
 
       this.time += dt;
+      this.sceneTimer += dt;
+      while (this.sceneTimer >= SCENE_DURATION) {
+        this.sceneTimer -= SCENE_DURATION;
+        this.advanceScene();
+      }
       const dcfg = this.difficultyForDay(this.day);
 
       if (!this.bossAlive) {
@@ -1346,27 +1350,22 @@
         this.groundScrollX -= GROUND_TILE_SIZE;
         this.groundColumnStart += 1;
         this.shiftGroundColumns(this.groundGrid, this.groundGrid.env);
-        if (this.nextGroundGrid) this.shiftGroundColumns(this.nextGroundGrid, this.nextGroundGrid.env || this.nextGroundEnv || this.groundBaseEnv);
         groundShifted = true;
       }
       if (groundShifted) {
         this.groundColumnStart = this.groundGrid.startCol;
-        renderer3D.updateGround(this.groundGrid, this.nextGroundGrid, this.nextGroundGrid ? this.groundBlend : 0, this.groundScrollX, true);
+        renderer3D.updateGround(this.groundGrid, null, 0, this.groundScrollX, true);
       }
       for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles, this.meteors]) {
         for (const e of arr) e.pos.x -= scroll;
       }
-      scrollScenery(this.scenery, canvas.width, canvas.height, CONFIG.scrollSpeed, dt, Math.random, this.environment);
-      this.updateGroundBlend(dt);
-      if (this.environment === 'transition') {
-        this.transitionTimer -= dt;
-        if (this.transitionTimer <= 0) {
-          this.environment = this.nextEnvironment;
-          this.nextEnvironment = null;
-          this.finalizeGroundTransition();
-          this.scenery = generateScenery(40, canvas.width, canvas.height, this.environment);
-        }
+      if (this.environment !== 'water') {
+        scrollScenery(this.scenery, canvas.width, canvas.height, CONFIG.scrollSpeed, dt, Math.random, this.environment);
+      } else if (this.scenery.length) {
+        // Let leftover non-water scenery drift away without spawning new items
+        scrollScenery(this.scenery, canvas.width, canvas.height, CONFIG.scrollSpeed, dt, Math.random, 'forest');
       }
+      this.updateGroundBlend(dt);
 
       const blockingTrees = this.scenery.filter(s => SCENERY_MODELS[s.type]?.radius);
 
@@ -1427,24 +1426,7 @@
 
       // Boss lifecycle
       if (this.bossAlive && (!this.boss || !this.boss.alive)) {
-        const prevEnv = this.environment;
         this.bossAlive = false; this.boss = null; this.day++; this.dayTimer = 0; this.player.healToFull();
-        const newEnv = Math.floor((this.day-1)/3)%2 === 0 ? 'land' : 'water';
-        if (newEnv !== prevEnv) {
-          this.nextEnvironment = newEnv;
-          this.environment = 'transition';
-          this.transitionTimer = canvas.width / CONFIG.scrollSpeed;
-          this.prepareGroundTransition(newEnv);
-        } else {
-          this.environment = newEnv;
-          this.scenery = generateScenery(40, canvas.width, canvas.height, this.environment);
-          this.groundBaseEnv = newEnv;
-          const startCol = this.groundGrid ? this.groundGrid.startCol : -1;
-          this.groundColumnStart = startCol;
-          this.groundGrid = createGroundTiles(newEnv, canvas.width, canvas.height, startCol);
-          this.nextGroundGrid = null;
-          renderer3D.updateGround(this.groundGrid, null, 0, this.groundScrollX, true);
-        }
         showToast(`Day ${this.day} begins — tougher foes ahead.`, 'ok'); AudioBus.blip({freq: 860, dur:.08, vol:.16});
       }
 
@@ -1454,7 +1436,7 @@
 
     render(){
       const w = canvas.width, h = canvas.height;
-      if (renderer3D.renderer) renderer3D.renderer.setClearColor('#002b11');
+      if (renderer3D.renderer) renderer3D.renderer.setClearColor('#000000');
       renderer3D.beginFrame();
       renderer3D.hideWaterSurface();
 
@@ -1503,6 +1485,34 @@
       }
 
       this.particles.forEach((p,i)=>renderer3D.addBlock(`particle${i}`, p.pos.x, p.pos.y, 0xffffff, p.radius*2));
+
+      // 3D edge fog: two bands — positioned right at the border with minimal intrusion
+      {
+        const s = Math.floor(GROUND_TILE_SIZE * 2.6); // larger blocks for more height
+        const half = s * 0.5;
+        const inset = 12; // only this many pixels intrude into the playfield
+        // Edge band sits almost off-screen; outside band is fully off-screen
+        let i = 0;
+        for (let y = -s; y <= h + s; y += s) {
+          // Left side: outside + near-edge (barely inside)
+          renderer3D.addBlock(`fogL_out_${i}`, -half - s + inset, y, 0x000000, s, 1.0);
+          renderer3D.addBlock(`fogL_${i}`, -half + inset, y, 0x000000, s, 0.75);
+          // Right side: near-edge (barely inside) + outside
+          renderer3D.addBlock(`fogR_${i}`, w + half - inset, y, 0x000000, s, 0.75);
+          renderer3D.addBlock(`fogR_out_${i}`, w + half + s - inset, y, 0x000000, s, 1.0);
+          i++;
+        }
+        i = 0;
+        for (let x = -s; x <= w + s; x += s) {
+          // Top side: outside + near-edge
+          renderer3D.addBlock(`fogT_out_${i}`, x, -half - s + inset, 0x000000, s, 1.0);
+          renderer3D.addBlock(`fogT_${i}`, x, -half + inset, 0x000000, s, 1.0);
+          // Bottom side: near-edge + outside
+          renderer3D.addBlock(`fogB_${i}`, x, h + half - inset, 0x000000, s, 1.0);
+          renderer3D.addBlock(`fogB_out_${i}`, x, h + half + s - inset, 0x000000, s, 1.0);
+          i++;
+        }
+      }
 
       renderer3D.render();
 
@@ -1638,5 +1648,6 @@
     game.player.pos.y = Math.max(game.player.radius, Math.min(canvas.height - game.player.radius, game.player.pos.y));
   });
   </script>
+    
 </body>
 </html>

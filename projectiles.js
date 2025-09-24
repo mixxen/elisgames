@@ -49,6 +49,7 @@ export function createProjectileClasses(Entity, Vec2, Particle, rand = Math.rand
     constructor(x, y, vel, dmg, ang) {
       super(x, y, vel, dmg, ang, 2.5, 6);
       this.target = null;
+      this.trailTimer = Infinity;
     }
     findTarget(game) {
       let closest = null;

@@ -57,16 +57,17 @@ export class Renderer3D {
     };
     this.groundMaterialCache = new Map();
 
-    this.addBlock = (id, x, y, color = 0xffffff, size = 20) => {
+    this.addBlock = (id, x, y, color = 0xffffff, size = 20, opacity = 1) => {
       let geometry = this.blockGeoCache.get(size);
       if (!geometry) {
         geometry = new THREE.BoxGeometry(size, size, size);
         this.blockGeoCache.set(size, geometry);
       }
-      let material = this.blockMatCache.get(color);
+      const key = `${color}|${opacity}`;
+      let material = this.blockMatCache.get(key);
       if (!material) {
-        material = new THREE.MeshLambertMaterial({ color });
-        this.blockMatCache.set(color, material);
+        material = new THREE.MeshLambertMaterial({ color, transparent: opacity < 1, opacity });
+        this.blockMatCache.set(key, material);
       }
       let mesh = this.objects.get(id);
       const isReusable = mesh && mesh.userData?.kind === 'block';
@@ -438,11 +439,13 @@ export class Renderer3D {
     const zOffset = transparent ? -7.5 : -8;
     for (const [type, positions] of byType.entries()) {
       const geometry = new THREE.PlaneGeometry(GROUND_TILE_SIZE, GROUND_TILE_SIZE);
-      const material = this._getGroundMaterial(type, transparent);
+      // Make water tiles transparent even on the base layer
+      const isWater = type === 'water';
+      const material = this._getGroundMaterial(type, transparent || isWater);
       const mesh = new THREE.InstancedMesh(geometry, material, positions.length);
       mesh.frustumCulled = false;
       this.scene.add(mesh);
-      layer.set(type, { mesh, tiles: positions, zOffset });
+      layer.set(type, { mesh, tiles: positions, zOffset, type });
     }
     return layer;
   }
@@ -485,7 +488,8 @@ export class Renderer3D {
     this._applyGroundOffset(this.groundState.baseMeshes, offsetWrapped);
     this._applyGroundOffset(this.groundState.blendMeshes, offsetWrapped);
     for (const entry of this.groundState.baseMeshes.values()) {
-      entry.mesh.material.opacity = 1;
+      const isWater = entry.type === 'water';
+      entry.mesh.material.opacity = isWater ? 0.58 : 1;
       entry.mesh.visible = true;
     }
     for (const entry of this.groundState.blendMeshes.values()) {
