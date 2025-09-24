@@ -18,6 +18,16 @@ export class Renderer3D {
     this.blockGeoCache = new Map();
     this.blockMatCache = new Map();
     this.sphereGeoCache = new Map();
+    this.viewportWidth = 1;
+    this.viewportHeight = 1;
+    this._center = new THREE.Vector3();
+    this._cameraOffset = new THREE.Vector3();
+    this._xAxis = new THREE.Vector3(1, 0, 0);
+    this._raycaster = new THREE.Raycaster();
+    this._mouseNDC = new THREE.Vector2();
+    this._groundPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    this._intersection = new THREE.Vector3();
+    this._unusedIds = null;
 
     this.addBlock = (id, x, y, color = 0xffffff, size = 20) => {
       let geometry = this.blockGeoCache.get(size);
@@ -30,11 +40,23 @@ export class Renderer3D {
         material = new THREE.MeshLambertMaterial({ color });
         this.blockMatCache.set(color, material);
       }
-      const mesh = new THREE.Mesh(geometry, material);
+      let mesh = this.objects.get(id);
+      const isReusable = mesh && mesh.userData?.kind === 'block';
+      if (isReusable) {
+        if (mesh.geometry !== geometry) mesh.geometry = geometry;
+        if (mesh.material !== material) mesh.material = material;
+      } else {
+        if (mesh) {
+          this._disposeMesh(mesh);
+        }
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.userData = { kind: 'block', sharedGeometry: true, sharedMaterial: true };
+        mesh.isBlock = true;
+        this.scene.add(mesh);
+        this.objects.set(id, mesh);
+      }
       mesh.position.set(x, -y, 0);
-      mesh.isBlock = true;
-      this.scene.add(mesh);
-      this.objects.set(id, mesh);
+      if (this._unusedIds) this._unusedIds.delete(id);
       return mesh;
     };
 
@@ -44,15 +66,37 @@ export class Renderer3D {
         texture = new THREE.CanvasTexture(image);
         this.textureCache.set(image, texture);
       }
-      const w = image.width * scale;
-      const h = image.height * scale;
-      const geometry = new THREE.BoxGeometry(w, h, w / 2);
-      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
-      const mesh = new THREE.Mesh(geometry, material);
+      const width = image.width * scale;
+      const height = image.height * scale;
+      const depth = width / 2;
+      let mesh = this.objects.get(id);
+      const reusable = mesh && mesh.userData?.kind === 'sprite' && mesh.userData.image === image;
+      if (reusable) {
+        if (mesh.material.map !== texture) {
+          mesh.material.map = texture;
+          mesh.material.needsUpdate = true;
+        }
+        if (mesh.userData.scale !== scale) {
+          if (mesh.geometry && typeof mesh.geometry.dispose === 'function') {
+            mesh.geometry.dispose();
+          }
+          mesh.geometry = new THREE.BoxGeometry(width, height, depth);
+          mesh.userData.scale = scale;
+        }
+      } else {
+        if (mesh) {
+          this._disposeMesh(mesh);
+        }
+        const geometry = new THREE.BoxGeometry(width, height, depth);
+        const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false });
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.userData = { kind: 'sprite', image, sharedGeometry: false, sharedMaterial: false, scale };
+        this.scene.add(mesh);
+        this.objects.set(id, mesh);
+      }
       mesh.position.set(x, -y, 0);
       mesh.rotation.y = -angle;
-      this.scene.add(mesh);
-      this.objects.set(id, mesh);
+      if (this._unusedIds) this._unusedIds.delete(id);
       return mesh;
     };
 
@@ -67,45 +111,113 @@ export class Renderer3D {
         material = new THREE.MeshLambertMaterial({ color });
         this.blockMatCache.set(color, material);
       }
-      const mesh = new THREE.Mesh(geometry, material);
+      let mesh = this.objects.get(id);
+      const reusable = mesh && mesh.userData?.kind === 'sphere';
+      if (reusable) {
+        if (mesh.geometry !== geometry) mesh.geometry = geometry;
+        if (mesh.material !== material) mesh.material = material;
+      } else {
+        if (mesh) {
+          this._disposeMesh(mesh);
+        }
+        mesh = new THREE.Mesh(geometry, material);
+        mesh.userData = { kind: 'sphere', sharedGeometry: true, sharedMaterial: true };
+        this.scene.add(mesh);
+        this.objects.set(id, mesh);
+      }
+      mesh.userData.radius = radius;
+      mesh.userData.color = color;
       mesh.position.set(x, -y, 0);
-      this.scene.add(mesh);
-      this.objects.set(id, mesh);
+      if (this._unusedIds) this._unusedIds.delete(id);
       return mesh;
     };
   }
 
   setSize(w, h) {
+    this.viewportWidth = w;
+    this.viewportHeight = h;
     if (this.renderer) {
       this.renderer.setSize(w, h, false);
     }
+    const center = this._center.set(w / 2, -h / 2, 0);
+    const distance = Math.max(w, h) * 0.8 + 200;
     this.camera.aspect = w / h;
+    this.camera.near = Math.max(5, distance * 0.02);
+    this.camera.far = distance * 3;
     this.camera.updateProjectionMatrix();
-    this.camera.position.set(w / 2, -h / 2, 500);
-    this.camera.lookAt(w / 2, -h / 2, 0);
-    this.camera.rotateX(0.6);
-    this.camera.rotateZ(Math.PI / 4);
+    this._cameraOffset
+      .set(0, 0, distance)
+      .applyAxisAngle(this._xAxis, 0.6);
+    this.camera.position.copy(center).add(this._cameraOffset);
+    this.camera.up.set(0, 0, 1);
+    this.camera.lookAt(center);
+  }
+
+  beginFrame() {
+    if (this._unusedIds) {
+      this._finalizeFrame();
+    }
+    this._unusedIds = new Set(this.objects.keys());
+  }
+
+  _disposeMesh(mesh) {
+    if (!mesh) return;
+    this.scene.remove(mesh);
+    const sharedGeometry = mesh.userData?.sharedGeometry;
+    if (!sharedGeometry && mesh.geometry && typeof mesh.geometry.dispose === 'function') {
+      mesh.geometry.dispose();
+    }
+    const sharedMaterial = mesh.userData?.sharedMaterial;
+    const material = mesh.material;
+    if (!sharedMaterial && material) {
+      if (Array.isArray(material)) {
+        for (const m of material) {
+          if (m && typeof m.dispose === 'function') m.dispose();
+        }
+      } else if (typeof material.dispose === 'function') {
+        material.dispose();
+      }
+    }
+  }
+
+  _finalizeFrame() {
+    if (!this._unusedIds) return;
+    for (const id of this._unusedIds) {
+      const mesh = this.objects.get(id);
+      if (!mesh) continue;
+      this._disposeMesh(mesh);
+      this.objects.delete(id);
+    }
+    this._unusedIds = null;
   }
 
   clear() {
     for (const mesh of this.objects.values()) {
-      this.scene.remove(mesh);
-      if (!mesh.isBlock) {
-        mesh.geometry.dispose();
-        if (Array.isArray(mesh.material)) {
-          for (const m of mesh.material) m.dispose();
-        } else {
-          mesh.material.dispose();
-        }
-      }
+      this._disposeMesh(mesh);
     }
     this.objects.clear();
+    this._unusedIds = null;
   }
 
   render() {
+    this._finalizeFrame();
     if (this.renderer) {
       this.renderer.render(this.scene, this.camera);
     }
+  }
+
+  screenToWorld(x, y) {
+    if (!this.viewportWidth || !this.viewportHeight) {
+      return { x, y };
+    }
+    this._mouseNDC.set(
+      (x / this.viewportWidth) * 2 - 1,
+      -(y / this.viewportHeight) * 2 + 1
+    );
+    this._raycaster.setFromCamera(this._mouseNDC, this.camera);
+    const hit = this._raycaster.ray.intersectPlane(this._groundPlane, this._intersection);
+    if (!hit) return { x, y };
+    return { x: this._intersection.x, y: -this._intersection.y };
   }
 }
 

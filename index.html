@@ -216,12 +216,28 @@
   const renderer3D = new Renderer3D(canvas);
 
   let DPR = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  const Input = { keys:new Set(), mouse:new Vec2(), mdown:false, rdown:false, gdown:false, special:false };
+  let lastMouseClient = null;
+  const updateMouseFromClient = (clientX, clientY) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = (clientX - rect.left) * DPR;
+    const sy = (clientY - rect.top) * DPR;
+    lastMouseClient = { x: clientX, y: clientY };
+    const world = renderer3D.screenToWorld(sx, sy);
+    Input.mouse.set(world.x, world.y);
+  };
   function resize() {
     DPR = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     const w = window.innerWidth, h = window.innerHeight;
     renderer3D.setSize(Math.floor(w * DPR), Math.floor(h * DPR));
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
+    if (lastMouseClient) {
+      updateMouseFromClient(lastMouseClient.x, lastMouseClient.y);
+    } else {
+      const rect = canvas.getBoundingClientRect();
+      updateMouseFromClient(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    }
   }
   resize();
   window.addEventListener('resize', resize);
@@ -230,7 +246,6 @@
   // -------------------------
   // Input
   // -------------------------
-  const Input = { keys:new Set(), mouse:new Vec2(), mdown:false, rdown:false, gdown:false, special:false };
   const keymap = (e) => e.key.length===1 ? e.key.toLowerCase() : e.key;
   window.addEventListener('keydown', (e) => {
     const k = keymap(e);
@@ -250,11 +265,14 @@
     if (k==='g') Input.gdown = false;
     if (k==='r') Input.special = false;
   });
-  canvas.addEventListener('mousedown', (e) => { if (e.button===0) Input.mdown = true; if (e.button===2) Input.rdown = true; });
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button===0) Input.mdown = true;
+    if (e.button===2) Input.rdown = true;
+    updateMouseFromClient(e.clientX, e.clientY);
+  });
   window.addEventListener('mouseup',   (e) => { if (e.button===0) Input.mdown = false; if (e.button===2) Input.rdown = false; });
   canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    Input.mouse.set((e.clientX - rect.left) * DPR, (e.clientY - rect.top) * DPR);
+    updateMouseFromClient(e.clientX, e.clientY);
   });
 
   // -------------------------
@@ -955,7 +973,7 @@
       const w = canvas.width, h = canvas.height;
       const bg = backgroundForEnv(this.environment);
       if (renderer3D.renderer) renderer3D.renderer.setClearColor(bg);
-      renderer3D.clear();
+      renderer3D.beginFrame();
 
       this.scenery.forEach((d,i)=>{
         const sprite = Sprites[d.type];
