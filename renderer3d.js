@@ -1,5 +1,19 @@
 import * as THREE from 'three';
 
+const GROUND_TILE_SIZE = 64;
+
+const GROUND_COLORS = {
+  grass: 0x2a6b33,
+  sand: 0xd7c487,
+  water: 0x1c5e82
+};
+
+const GROUND_EMISSIVE = {
+  grass: 0x143920,
+  sand: 0x5c4a2a,
+  water: 0x0b2a3a
+};
+
 export class Renderer3D {
   constructor(canvas) {
     this.scene = new THREE.Scene();
@@ -34,6 +48,14 @@ export class Renderer3D {
     this.waterSurface = null;
     this.crateGeometry = new THREE.BoxGeometry(18, 18, 18);
     this.crateMaterialCache = new Map();
+    this.groundState = {
+      baseTiles: null,
+      blendTiles: null,
+      baseMeshes: new Map(),
+      blendMeshes: new Map(),
+      blendFactor: 0
+    };
+    this.groundMaterialCache = new Map();
 
     this.addBlock = (id, x, y, color = 0xffffff, size = 20) => {
       let geometry = this.blockGeoCache.get(size);
@@ -333,7 +355,6 @@ export class Renderer3D {
     }
     const segments = 32;
     const geometry = new THREE.PlaneGeometry(width, height, segments, segments);
-    geometry.rotateX(-Math.PI / 2);
     const positions = geometry.attributes.position.array;
     const original = new Float32Array(positions.length);
     original.set(positions);
@@ -351,11 +372,12 @@ export class Renderer3D {
     return this.waterSurface;
   }
 
-  updateWaterSurface(width, height, time) {
+  updateWaterSurface(width, height, time, offset = 0) {
     const surface = this._ensureWaterSurface(width, height);
     const { mesh, geometry, original } = surface;
     mesh.visible = true;
-    mesh.position.set(width / 2, -height / 2, -6);
+    const offsetWrapped = ((offset % GROUND_TILE_SIZE) + GROUND_TILE_SIZE) % GROUND_TILE_SIZE;
+    mesh.position.set(width / 2 - offsetWrapped, -height / 2, -6);
     const positions = geometry.attributes.position.array;
     for (let i = 0; i < positions.length; i += 3) {
       const ox = original[i];
@@ -372,6 +394,103 @@ export class Renderer3D {
   hideWaterSurface() {
     if (this.waterSurface) {
       this.waterSurface.mesh.visible = false;
+    }
+  }
+
+  _clearGroundLayer(layer) {
+    if (!layer) return;
+    for (const entry of layer.values()) {
+      const mesh = entry.mesh || entry;
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+    }
+    layer.clear();
+  }
+
+  _getGroundMaterial(type, transparent) {
+    const key = `${type}-${transparent ? 'blend' : 'base'}`;
+    let material = this.groundMaterialCache.get(key);
+    if (!material) {
+      material = new THREE.MeshLambertMaterial({
+        color: GROUND_COLORS[type] || 0xffffff,
+        emissive: GROUND_EMISSIVE[type] || 0x000000,
+        transparent,
+        opacity: transparent ? 0 : 1,
+        side: THREE.DoubleSide
+      });
+      this.groundMaterialCache.set(key, material);
+    }
+    return material;
+  }
+
+  _buildGroundLayer(grid, transparent) {
+    const layer = new Map();
+    if (!grid || !grid.tiles || !grid.tiles.length) return layer;
+    const byType = new Map();
+    for (const rowTiles of grid.tiles) {
+      for (const tile of rowTiles) {
+        if (!GROUND_COLORS[tile.type]) continue;
+        let arr = byType.get(tile.type);
+        if (!arr) { arr = []; byType.set(tile.type, arr); }
+        arr.push(tile);
+      }
+    }
+    const zOffset = transparent ? -7.5 : -8;
+    for (const [type, positions] of byType.entries()) {
+      const geometry = new THREE.PlaneGeometry(GROUND_TILE_SIZE, GROUND_TILE_SIZE);
+      const material = this._getGroundMaterial(type, transparent);
+      const mesh = new THREE.InstancedMesh(geometry, material, positions.length);
+      mesh.frustumCulled = false;
+      this.scene.add(mesh);
+      layer.set(type, { mesh, tiles: positions, zOffset });
+    }
+    return layer;
+  }
+
+  _applyGroundOffset(layer, offset) {
+    if (!layer) return;
+    const matrix = new THREE.Matrix4();
+    for (const entry of layer.values()) {
+      const { mesh, tiles, zOffset } = entry;
+      tiles.forEach((tile, idx) => {
+        const x = tile.colIndex * GROUND_TILE_SIZE + GROUND_TILE_SIZE / 2 - offset;
+        const y = tile.rowIndex * GROUND_TILE_SIZE + GROUND_TILE_SIZE / 2;
+        matrix.makeTranslation(x, -y, zOffset + (tile.type === 'water' ? -2 : 0));
+        mesh.setMatrixAt(idx, matrix);
+      });
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  updateGround(baseTiles, blendTiles, blend = 0, offset = 0, force = false) {
+    if (!this.groundState) return;
+    if (force) {
+      this._clearGroundLayer(this.groundState.baseMeshes);
+      this._clearGroundLayer(this.groundState.blendMeshes);
+      this.groundState.baseTiles = null;
+      this.groundState.blendTiles = null;
+    }
+    if (this.groundState.baseTiles !== baseTiles) {
+      this._clearGroundLayer(this.groundState.baseMeshes);
+      this.groundState.baseMeshes = this._buildGroundLayer(baseTiles, false);
+      this.groundState.baseTiles = baseTiles || null;
+    }
+    if (this.groundState.blendTiles !== blendTiles) {
+      this._clearGroundLayer(this.groundState.blendMeshes);
+      this.groundState.blendMeshes = this._buildGroundLayer(blendTiles, true);
+      this.groundState.blendTiles = blendTiles || null;
+    }
+    this.groundState.blendFactor = blend;
+    const offsetWrapped = ((offset % GROUND_TILE_SIZE) + GROUND_TILE_SIZE) % GROUND_TILE_SIZE;
+    this._applyGroundOffset(this.groundState.baseMeshes, offsetWrapped);
+    this._applyGroundOffset(this.groundState.blendMeshes, offsetWrapped);
+    for (const entry of this.groundState.baseMeshes.values()) {
+      entry.mesh.material.opacity = 1;
+      entry.mesh.visible = true;
+    }
+    for (const entry of this.groundState.blendMeshes.values()) {
+      entry.mesh.material.opacity = blend;
+      entry.mesh.visible = blendTiles && blend > 0.001;
     }
   }
 
