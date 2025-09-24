@@ -11,7 +11,7 @@ r.setSize(800, 600);
 assert(r.camera instanceof THREE.PerspectiveCamera, 'perspective camera');
 assert(r.camera.aspect === 800 / 600, 'camera aspect');
 const center = new THREE.Vector3(400, -300, 0);
-const expectedDistance = Math.max(800, 600) * 0.8 + 200;
+const expectedDistance = Math.max(800, 600) * r._distanceFactor + r._distancePadding;
 const actualDistance = r.camera.position.clone().sub(center).length();
 assert(Math.abs(actualDistance - expectedDistance) < 1e-6, 'camera distance');
 assert(r.camera.far > actualDistance, 'camera far plane covers scene');

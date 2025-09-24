@@ -20,6 +20,8 @@ export class Renderer3D {
     this.sphereGeoCache = new Map();
     this.viewportWidth = 1;
     this.viewportHeight = 1;
+    this._distanceFactor = 0.55;
+    this._distancePadding = 140;
     this._center = new THREE.Vector3();
     this._cameraOffset = new THREE.Vector3();
     this._xAxis = new THREE.Vector3(1, 0, 0);
@@ -140,7 +142,7 @@ export class Renderer3D {
       this.renderer.setSize(w, h, false);
     }
     const center = this._center.set(w / 2, -h / 2, 0);
-    const distance = Math.max(w, h) * 0.8 + 200;
+    const distance = Math.max(w, h) * this._distanceFactor + this._distancePadding;
     this.camera.aspect = w / h;
     this.camera.near = Math.max(5, distance * 0.02);
     this.camera.far = distance * 3;
