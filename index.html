@@ -171,6 +171,26 @@
   const choice = (arr) => arr[(Math.random() * arr.length) | 0];
   const now = () => performance.now();
 
+  function spawnParticles(game, x, y, opts = {}) {
+    const {
+      angle = 0,
+      spread = Math.PI / 8,
+      count = 4,
+      speed = [60, 140],
+      life = [0.12, 0.25],
+      colors = ['#ffffff'],
+      size = [1.4, 2.4]
+    } = opts;
+    for (let i = 0; i < count; i++) {
+      const ang = angle + rand(-spread, spread);
+      const vel = Vec2.fromAngle(ang, rand(speed[0], speed[1]));
+      const col = Array.isArray(colors) ? choice(colors) : colors;
+      const lifeSpan = Array.isArray(life) ? rand(life[0], life[1]) : life;
+      const radius = Array.isArray(size) ? rand(size[0], size[1]) : size;
+      game.particles.push(new Particle(x, y, vel, lifeSpan, col, radius));
+    }
+  }
+
   class Vec2 {
     constructor(x=0, y=0) { this.x = x; this.y = y; }
     copy() { return new Vec2(this.x, this.y); }
@@ -208,6 +228,8 @@
     },
     difficultyPerDay: { hp: 1.18, speed: 1.10, dmg: 1.12, spawnRate: 1.14 },
   };
+
+  const TREE_COLLISION_RADIUS = 36;
 
   // -------------------------
   // Canvas
@@ -403,6 +425,256 @@
     s.fillStyle='#64ff64'; s.fillRect(3,6,8,2); s.fillRect(8,4,3,6);
   });
 
+  function createVoxelModel(voxelSize, builder) {
+    const map = new Map();
+    const key = (x, y, z) => `${x},${y},${z}`;
+    let baseRotation = { x: 0, y: 0, z: 0 };
+    let dynamic = true;
+    const set = (x, y, z, color) => { map.set(key(x, y, z), { x, y, z, color }); };
+    const fill = (xs, ys, zs, color) => {
+      for (const x of xs) for (const y of ys) for (const z of zs) set(x, y, z, color);
+    };
+    builder({ set, fill, setBaseRotation: (rot) => {
+      baseRotation = {
+        x: Number(rot?.x) || 0,
+        y: Number(rot?.y) || 0,
+        z: Number(rot?.z) || 0,
+      };
+    }, setDynamic: (flag) => { dynamic = !!flag; }});
+    return { voxelSize, voxels: Array.from(map.values()), baseRotation, dynamic };
+  }
+
+  const PLAYER_VOXEL_MODEL = createVoxelModel(4, ({ fill, set }) => {
+    // Boots & legs
+    fill([-1, 1], [-1, 0], [0], '#0d121a');
+    fill([-1, 1], [-1, 0], [1], '#22334a');
+    fill([-1, 0, 1], [-1, 0], [2], '#22334a');
+
+    // Torso
+    fill([-1, 0, 1], [-1, 0], [3, 4], '#3ec4ff');
+    fill([-1, 0, 1], [-1, 0], [5], '#3ec4ff');
+    set(0, -1, 4, '#bfe9ff');
+    set(1, -1, 3, '#bfe9ff');
+
+    // Arms
+    fill([-2, 2], [-1, 0], [3, 4], '#3ec4ff');
+    set(-2, -1, 3, '#f4d7c5');
+    set(2, -1, 3, '#f4d7c5');
+
+    // Neck & head
+    fill([0], [-1, 0], [5], '#f4d7c5');
+    fill([-1, 0, 1], [-1, 0], [6, 7], '#f4d7c5');
+    set(1, -1, 6, '#000000');
+
+    // Hair
+    fill([-1, 0, 1], [-1, 0], [8], '#3a2a1a');
+    fill([-1, 0, 1], [0], [7], '#3a2a1a');
+  });
+
+  const RAPTOR_VOXEL_MODEL = createVoxelModel(3, ({ fill, set }) => {
+    const scales = '#4ecf63', belly = '#a7f0b2', claw = '#1b2433', eye = '#f4f8ff', pupil = '#000000';
+    // Tail - long and tapered
+    fill([-6, -5, -4], [-1, 0], [1], scales);
+    fill([-6], [-1, 0], [0], scales);
+    fill([-3, -2], [-1, 0], [1, 2], scales);
+    // Body core with slightly arched back
+    fill([-1, 0, 1], [-1, 0], [1, 2], scales);
+    fill([-1, 0], [-1, 0], [2], belly);
+    // Chest / shoulder bulge
+    fill([2], [-1, 0], [2], scales);
+    set(2, -1, 2, belly);
+    // Neck and head angled forward
+    fill([2, 3], [-1, 0], [2, 3], scales);
+    set(3, -1, 3, eye);
+    set(3, -1, 2, pupil);
+    // Snout tip / jaw
+    fill([4], [-1, 0], [2], scales);
+    set(4, -1, 2, pupil);
+    // Arms tucked in front
+    fill([1, 2], [-1, 0], [3], scales);
+    set(2, -1, 3, claw);
+    set(2, 0, 3, claw);
+    // Powerful legs
+    fill([0, 1], [-1, 0], [0], claw);
+    fill([-1, -2], [-1, 0], [0], claw);
+    // Head crest accent
+    set(2, 0, 3, scales);
+  });
+
+  const WATER_VOXEL_MODEL = createVoxelModel(4, ({ fill, set }) => {
+    const body = '#5ab4ff', belly = '#bfe9ff', fin = '#3d94d9';
+    fill([-3, -2, -1, 0, 1, 2, 3, 4], [-1, 0], [1, 2], body);
+    fill([4, 5], [-1, 0], [2], body);
+    fill([-1, 0, 1, 2], [-1, 0], [1], belly);
+    fill([0, 1], [-1, 0], [3], fin);
+    fill([-2, -3], [-1, 0], [3], fin);
+    set(5, -1, 2, '#ffffff');
+    set(5, -1, 1, '#000000');
+  });
+
+  const PTERO_VOXEL_MODEL = createVoxelModel(3, ({ fill, set, setBaseRotation }) => {
+    const spar = '#9ddcff', membrane = '#6bb4e6', body = '#4b7fb3', beak = '#2f4f7a', claw = '#1f2533', eye = '#001a33';
+    setBaseRotation({ x: -Math.PI / 11, y: 0, z: 0 });
+
+    // Body spine and tail aligned with flight direction (positive X)
+    fill([-6, -5, -4, -3, -2, -1, 0], [-1, 0], [0], body);
+    fill([-8, -7], [-1, 0], [0], membrane);
+
+    // Head, crest & beak extending forward
+    fill([1, 2], [-1, 0], [0], body);
+    fill([2, 3, 4, 5, 6, 7], [-1, 0], [0], beak);
+    fill([4, 5, 6], [-1, 0], [-1], membrane);
+    set(4, -1, 0, eye);
+    set(4, 0, 0, eye);
+    set(7, -1, 0, '#d2e6ff');
+    set(5, -1, 1, body);
+
+    // Wings: tapered triangle with thicker root near body
+    const maxSpan = 6;
+    for (let y = -maxSpan; y <= maxSpan; y++) {
+      const absY = Math.abs(y);
+      const back = Math.max(1, 3 - Math.floor(absY / 2));
+      const forward = Math.max(0, 1 - Math.floor(absY / 3));
+      const sparXs = [];
+    for (let dx = -back; dx <= forward; dx++) sparXs.push(dx);
+      fill(sparXs, [y], [0], spar);
+
+      if (forward > 0) {
+        set(forward, y, 0, '#c7e3ff');
+      }
+
+      if (back > 1 || forward > 0) {
+        const innerXs = [];
+        for (let dx = -back + 1; dx <= forward - 1; dx++) innerXs.push(dx);
+        if (innerXs.length > 0) {
+          const zLayer = absY <= 1 ? 1 : absY <= 3 ? 0 : -1;
+          fill(innerXs, [y], [zLayer], membrane);
+        }
+      }
+    }
+
+    // Feet tucked under
+    set(-1, -1, -1, claw);
+    set(-1, 0, -1, claw);
+    set(0, -1, -1, claw);
+    set(0, 0, -1, claw);
+  });
+
+  const TREX_VOXEL_MODEL = createVoxelModel(6, ({ fill, set }) => {
+    const body = '#ff6b6b', belly = '#ffd0d0', dark = '#2a0613', eye = '#000000', tooth = '#ffe4e4';
+    // Tail — long and narrow tapering back
+    fill([-9, -8], [-1, 0], [2], body);
+    fill([-7, -6, -5], [-1, 0], [2, 3], body);
+    fill([-7], [-1, 0], [1], body);
+
+    // Powerful hips and torso
+    fill([-4, -3, -2, -1, 0, 1, 2], [-1, 0], [2, 3], body);
+    fill([-2, -1, 0], [-1, 0], [1], body);
+    fill([-1, 0, 1], [-1, 0], [2], belly);
+
+    // Massive head with jaw
+    fill([3, 4, 5], [-1, 0], [3, 4], body);
+    fill([5, 6], [-1, 0], [3, 4], body);
+    fill([4, 5, 6], [-1, 0], [2], belly);
+    fill([4, 5, 6], [-1, 0], [1], belly);
+    set(6, -1, 3, eye);
+    set(5, -1, 4, eye);
+    set(6, -1, 2, tooth);
+    set(6, 0, 2, tooth);
+
+    // Lower jaw depth
+    set(5, -1, 1, dark);
+    set(5, 0, 1, dark);
+
+    // Tiny arms tucked near chest
+    set(2, -1, 3, body);
+    set(2, -1, 2, dark);
+    set(2, 0, 2, dark);
+
+    // Powerful legs and feet
+    fill([-2, -1], [-1, 0], [0, 1], dark);
+    fill([0, 1], [-1, 0], [0, 1], dark);
+    set(-1, -1, -1, dark);
+    set(1, -1, -1, dark);
+  });
+
+  const MOSA_VOXEL_MODEL = createVoxelModel(6, ({ fill, set }) => {
+    const body = '#5ab4ff', belly = '#bfe9ff', dark = '#103b5b';
+    fill([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4], [-1, 0], [2, 3], body);
+    fill([4, 5, 6], [-1, 0], [2], body);
+    fill([-2, -1, 0, 1, 2], [-1, 0], [1], belly);
+    fill([2, 3, 4], [-1, 0], [3], dark);
+    set(6, -1, 2, '#ffffff');
+    set(6, -1, 3, '#000000');
+  });
+
+  const TREE_OAK_VOXEL_MODEL = createVoxelModel(4, ({ fill, set, setDynamic }) => {
+    setDynamic(false);
+    const trunk = '#6f4424';
+    const leaves = '#2f7d31';
+    const highlight = '#4ea54a';
+    fill([-1, 0], [-1, 0], [0, 1, 2, 3, 4], trunk);
+    for (const z of [5, 6, 7]) {
+      fill([-3, -2, -1, 0, 1, 2, 3], [-3, -2, -1, 0, 1, 2, 3], [z], leaves);
+    }
+    fill([-2, -1, 0, 1, 2], [-2, -1, 0, 1, 2], [8], highlight);
+    fill([-3, -2, -1, 0, 1, 2, 3], [-3, -2, -1, 0, 1, 2, 3], [4], leaves);
+  });
+
+  const TREE_PINE_VOXEL_MODEL = createVoxelModel(4, ({ fill, set, setDynamic }) => {
+    setDynamic(false);
+    const trunk = '#5b3a1a';
+    const needles = '#1f5d2d';
+    fill([-1, 0], [-1, 0], [0, 1, 2, 3, 4], trunk);
+    let width = 4;
+    for (let z = 5; z <= 11; z++) {
+      const xs = [];
+      for (let dx = -width; dx <= width; dx++) xs.push(dx);
+      fill(xs, [-width, -width + 1, width - 1, width], [z], needles);
+      fill(xs, [ -width + 1, -width + 2, width - 2, width - 1], [z], needles);
+      width = Math.max(1, width - 1);
+    }
+    set(0, 0, 12, '#2f8748');
+  });
+
+  const TREE_BIRCH_VOXEL_MODEL = createVoxelModel(4, ({ fill, set, setDynamic }) => {
+    setDynamic(false);
+    const trunk = '#e8e8e8';
+    const bark = '#2f2f2f';
+    const canopy = '#5fae4a';
+    fill([-1, 0], [-1, 0], [0, 1, 2, 3, 4], trunk);
+    set(-1, -1, 1, bark); set(0, 0, 2, bark); set(-1, 0, 3, bark);
+    fill([-2, -1, 0, 1], [-2, -1, 0, 1], [5, 6, 7], canopy);
+    fill([-1, 0], [-1, 0], [8], '#7fdc6a');
+  });
+
+  const ROCK_VOXEL_MODEL = createVoxelModel(3, ({ fill, set, setDynamic }) => {
+    setDynamic(false);
+    const base = '#65707f';
+    const highlight = '#a4b1c2';
+    fill([-1, 0], [-1, 0], [0, 1], base);
+    fill([-2, -1, 0, 1], [-2, -1, 0, 1], [1, 2], base);
+    fill([-1, 0], [-1, 0], [3], highlight);
+    set(-2, -1, 1, highlight);
+    set(1, 0, 2, highlight);
+  });
+
+  const SCENERY_MODELS = {
+    tree_oak: { model: TREE_OAK_VOXEL_MODEL, scale: 3.2, radius: 42 },
+    tree_pine: { model: TREE_PINE_VOXEL_MODEL, scale: 3.4, radius: 46 },
+    tree_birch: { model: TREE_BIRCH_VOXEL_MODEL, scale: 3.0, radius: 38 },
+    rock: { model: ROCK_VOXEL_MODEL, scale: 2.4 }
+  };
+
+  const VOXEL_MODELS = {
+    player: PLAYER_VOXEL_MODEL,
+    raptor: RAPTOR_VOXEL_MODEL,
+    water: WATER_VOXEL_MODEL,
+    ptero: PTERO_VOXEL_MODEL,
+    trex: TREX_VOXEL_MODEL,
+    mosasaurus: MOSA_VOXEL_MODEL
+  };
+
   Sprites.grass = makeSprite(12,6,(s)=>{
     s.fillStyle='#1e5d2b'; s.fillRect(0,3,12,3);
     s.fillStyle='#2f7d31'; s.fillRect(2,1,8,4);
@@ -483,7 +755,7 @@
       if (level <= 0) return;
       const baseSpeed = CONFIG.player.bulletSpeed;
       const speeds = { slow: baseSpeed*0.7, medium: baseSpeed, fast: baseSpeed*1.3 };
-      const life = level === 1 ? 1.2 : 2.5;
+      const life = level === 1 ? 1.8 : 3.0;
       let speed = speeds.slow;
       let bullets = 1;
       let dmg = this.bulletDamage;
@@ -498,6 +770,15 @@
         const ang = this.aim.angle() + (i-(bullets-1)/2)*spread;
         const vel = Vec2.fromAngle(ang, speed);
         game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, dmg, ang, {life, color});
+        spawnParticles(game, this.pos.x + this.aim.x*(this.radius+2), this.pos.y + this.aim.y*(this.radius+2), {
+          angle: ang,
+          spread: 0.2,
+          count: 4,
+          speed: [160, 260],
+          life: [0.12, 0.2],
+          colors: color ? [color, '#ffe8a8'] : ['#fffbd1', '#f8bd7f'],
+          size: [1.6, 2.3]
+        });
       }
       AudioBus.blip({freq: 720, dur:.03, vol:.12});
     }
@@ -505,7 +786,7 @@
       const level = this.shotgunLevel;
       if (level <= 0) return;
       const baseSpeed = CONFIG.player.bulletSpeed*0.8;
-      const life = level >= 9 ? 0.8 : 0.4;
+      const life = level >= 9 ? 0.9 : 0.5;
       let front = 3, back = 0;
       if (level === 4) { front = 5; }
       if (level === 5) { front = 7; }
@@ -519,6 +800,15 @@
         const ang = this.aim.angle() + (i-(front-1)/2)*spread;
         const vel = Vec2.fromAngle(ang, baseSpeed);
         game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, this.bulletDamage, ang, {life, color:bulletColor, stun});
+        spawnParticles(game, this.pos.x + this.aim.x*(this.radius+2), this.pos.y + this.aim.y*(this.radius+2), {
+          angle: ang,
+          spread: 0.3,
+          count: 5,
+          speed: [140, 240],
+          life: [0.1, 0.18],
+          colors: [bulletColor, '#ffdba8'],
+          size: [1.4, 2.1]
+        });
       }
       if (back > 0){
         const base = this.aim.angle()+Math.PI;
@@ -526,6 +816,15 @@
           const ang = base + (i-(back-1)/2)*spread;
           const vel = Vec2.fromAngle(ang, baseSpeed);
           game.spawnBullet(this.pos.x - this.aim.x*this.radius, this.pos.y - this.aim.y*this.radius, vel, this.bulletDamage, ang, {life, color:bulletColor, stun});
+          spawnParticles(game, this.pos.x - this.aim.x*(this.radius+2), this.pos.y - this.aim.y*(this.radius+2), {
+            angle: ang,
+            spread: 0.3,
+            count: 4,
+            speed: [120, 200],
+            life: [0.1, 0.16],
+            colors: [bulletColor, '#ffdba8'],
+            size: [1.4, 2.1]
+          });
         }
       }
       AudioBus.blip({freq: 520, dur:.05, vol:.15});
@@ -533,11 +832,20 @@
     shootMissile(game){
       if (this.missileLevel <= 0) return;
       const level = this.missileLevel;
-      const speed = CONFIG.player.bulletSpeed * (0.9 + 0.03 * (level - 1));
+      const speed = CONFIG.player.bulletSpeed * (1.2 + 0.05 * (level - 1));
       const vel = Vec2.fromAngle(this.aim.angle(), speed);
       const opts = { missile:true };
       if (level === 10) { opts.explosive = true; opts.glow = true; }
       game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, this.bulletDamage*2, this.aim.angle(), opts);
+      spawnParticles(game, this.pos.x + this.aim.x*(this.radius+4), this.pos.y + this.aim.y*(this.radius+4), {
+        angle: this.aim.angle(),
+        spread: 0.18,
+        count: 6,
+        speed: [220, 320],
+        life: [0.16, 0.26],
+        colors: ['#aaffff', '#fff7d2'],
+        size: [2.2, 3.2]
+      });
       AudioBus.blip({freq: 300, dur:.08, vol:.2});
     }
     throwGrenade(game){
@@ -916,8 +1224,21 @@
         }
       }
 
-      // Bullet -> Enemy
+      const blockingTrees = this.scenery.filter(s => SCENERY_MODELS[s.type]?.radius);
+
+      // Bullet -> Enemy / Environment
       for (const b of this.bullets) {
+        if (!b.alive) continue;
+        for (const tree of blockingTrees) {
+          const dxTree = b.pos.x - tree.x;
+          const dyTree = b.pos.y - tree.y;
+          const meta = SCENERY_MODELS[tree.type];
+          const r = tree.radius || (meta && meta.radius) || TREE_COLLISION_RADIUS;
+          if (dxTree * dxTree + dyTree * dyTree <= r * r) {
+            b.alive = false;
+            break;
+          }
+        }
         if (!b.alive) continue;
         for (const e of this.enemies) {
           if (!e.alive) continue;
@@ -929,7 +1250,15 @@
             }
             b.alive = false; e.damage(b.dmg);
             if (b.stun) e.stun = Math.max(e.stun, b.stun);
-            this.particles.push(new Particle(b.pos.x, b.pos.y, Vec2.fromAngle(b.vel.angle(), 120), .3, '#fff', 1.6));
+            spawnParticles(this, b.pos.x, b.pos.y, {
+              angle: b.vel.angle(),
+              spread: 0.6,
+              count: 6,
+              speed: [90, 200],
+              life: [0.18, 0.32],
+              colors: ['#ffffff', '#ffce8a', '#ffe0ff'],
+              size: [1.6, 2.6]
+            });
             if (!e.alive) this.onKill(e); else e.pos.add(b.vel.copy().norm().scale(6));
             break;
           }
@@ -948,6 +1277,9 @@
         this.supplies = this.supplies.filter(e => e.alive);
         this.particles = this.particles.filter(e => e.alive);
         this.meteors = this.meteors.filter(e => e.alive);
+      if (this.particles.length > 400) {
+        this.particles.splice(0, this.particles.length - 400);
+      }
 
       // Boss lifecycle
       if (this.bossAlive && (!this.boss || !this.boss.alive)) {
@@ -974,15 +1306,27 @@
       const bg = backgroundForEnv(this.environment);
       if (renderer3D.renderer) renderer3D.renderer.setClearColor(bg);
       renderer3D.beginFrame();
+      if (this.environment === 'water') {
+        renderer3D.updateWaterSurface(w, h, this.time);
+      } else {
+        renderer3D.hideWaterSurface();
+      }
 
       this.scenery.forEach((d,i)=>{
-        const sprite = Sprites[d.type];
-        if (sprite) renderer3D.addSprite(`scenery${i}`, sprite, d.x, d.y);
+        const meta = SCENERY_MODELS[d.type];
+        if (meta) {
+          if (d.x > -100 && d.x < w + 100 && d.y > -100 && d.y < h + 100) {
+            renderer3D.addVoxelModel(`scenery${i}`, meta.model, d.x, d.y, 0, meta.scale);
+          }
+        } else {
+          const sprite = Sprites[d.type];
+          if (sprite) renderer3D.addSprite(`scenery${i}`, sprite, d.x, d.y);
+        }
       });
 
       this.supplies.forEach((s,i)=>{
-        const sprite = s.type==='grenade'?Sprites.crateGren:s.type==='shotgun'?Sprites.crateShot:s.type==='missile'?Sprites.crateMiss:Sprites.crateGun;
-        renderer3D.addSprite(`supply${i}`, sprite, s.pos.x, s.pos.y, 0, 1.6);
+        const color = s.type==='grenade' ? '#ffd36b' : s.type==='shotgun' ? '#ff64d2' : s.type==='missile' ? '#64ff64' : '#64d2ff';
+        renderer3D.addCrate(`supply${i}`, s.pos.x, s.pos.y, color, this.time * 1000);
       });
 
       this.grenades.forEach((gr,i)=>renderer3D.addSprite(`grenade${i}`, Sprites.grenade, gr.pos.x, gr.pos.y, 0, 1.6));
@@ -993,19 +1337,23 @@
       });
 
       this.enemies.forEach((e,i)=>{
-        let sprite, scale, ang = e.vel.angle();
-        if (e instanceof Raptor) { sprite = Sprites.raptor; scale = e.radius/12; }
-        else if (e instanceof WaterDino) { sprite = Sprites.waterdino; scale = e.radius/12; }
-        else if (e instanceof Pterodactyl) { sprite = Sprites.ptero; scale = e.radius/12; }
-        else if (e instanceof Mosasaurus) { sprite = Sprites.mosasaurus; scale = e.radius/24; }
-        else if (e instanceof TRex) { sprite = Sprites.trex; scale = e.radius/24; }
-        if (sprite) renderer3D.addSprite(`enemy${i}`, sprite, e.pos.x, e.pos.y, ang, scale);
+        const ang = e.vel.angle();
+        let model = null;
+        let scale = 1;
+        if (e instanceof Raptor) { model = VOXEL_MODELS.raptor; scale = e.radius / 12; }
+        else if (e instanceof WaterDino) { model = VOXEL_MODELS.water; scale = e.radius / 12; }
+        else if (e instanceof Pterodactyl) { model = VOXEL_MODELS.ptero; scale = e.radius / 12; }
+        else if (e instanceof Mosasaurus) { model = VOXEL_MODELS.mosasaurus; scale = (e.radius / 24) * 1.5; }
+        else if (e instanceof TRex) { model = VOXEL_MODELS.trex; scale = (e.radius / 24) * 1.6; }
+        if (model) {
+          renderer3D.addVoxelModel(`enemy${i}`, model, e.pos.x, e.pos.y, ang, scale);
+        }
       });
 
       this.meteors.forEach((m,i)=>renderer3D.addSprite(`meteor${i}`, Sprites.meteor, m.pos.x, m.pos.y, 0, m.radius/12));
 
       if (this.player) {
-        renderer3D.addSprite('player', Sprites.player, this.player.pos.x, this.player.pos.y, this.player.aim.angle(), this.player.radius/12);
+        renderer3D.addVoxelModel('player', PLAYER_VOXEL_MODEL, this.player.pos.x, this.player.pos.y, this.player.aim.angle(), this.player.radius/12);
       }
 
       this.particles.forEach((p,i)=>renderer3D.addBlock(`particle${i}`, p.pos.x, p.pos.y, 0xffffff, p.radius*2));

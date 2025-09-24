@@ -8,11 +8,35 @@ export function createProjectileClasses(Entity, Vec2, Particle, rand = Math.rand
       this.ang = ang || 0;
       this.color = color;
       this.stun = stun;
+      this.trailTimer = 0.08 + Math.random() * 0.04;
     }
-    update(dt) {
+    update(dt, game) {
       this.pos.add(this.vel.copy().scale(dt));
       this.life -= dt;
       if (this.life <= 0) this.alive = false;
+      if (game) {
+        this.trailTimer -= dt;
+        if (this.trailTimer <= 0) {
+          this.trailTimer = 0.1 + Math.random() * 0.05;
+          const backAng = this.vel.angle() + Math.PI + rand(-0.25, 0.25);
+          game.particles.push(new Particle(
+            this.pos.x,
+            this.pos.y,
+            Vec2.fromAngle(backAng, rand(20, 40)),
+            0.28,
+            '#6f7c9f',
+            1.4
+          ));
+          game.particles.push(new Particle(
+            this.pos.x,
+            this.pos.y,
+            Vec2.fromAngle(backAng, rand(40, 90)),
+            0.16,
+            this.color || '#d2e6ff',
+            1.4
+          ));
+        }
+      }
       if (canvas) {
         const w = canvas.width, h = canvas.height;
         if (this.pos.x < -20 || this.pos.y < -20 || this.pos.x > w + 20 || this.pos.y > h + 20) {
@@ -48,8 +72,8 @@ export function createProjectileClasses(Entity, Vec2, Particle, rand = Math.rand
         this.vel.add(desired.sub(this.vel).scale(0.1));
         this.ang = this.vel.angle();
       }
-      game.particles.push(new Particle(this.pos.x, this.pos.y, Vec2.fromAngle(rand(0, Math.PI*2), 20), .4, '#bbb', 2));
-      super.update(dt);
+      game.particles.push(new Particle(this.pos.x, this.pos.y, Vec2.fromAngle(rand(0, Math.PI*2), 30), .35, '#8de6ff', 2));
+      super.update(dt, game);
     }
   }
   return { Bullet, Missile };

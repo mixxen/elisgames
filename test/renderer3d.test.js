@@ -44,6 +44,21 @@ assert(sphereMesh.geometry instanceof THREE.SphereGeometry, 'sphere geometry');
 assert(sphereMesh.material.color.getHex() === 0xff00ff, 'sphere color');
 assert(r.scene.children.includes(sphereMesh), 'sphere added to scene');
 
+const voxelModel = {
+  voxelSize: 2,
+  voxels: [
+    { x: 0, y: 0, z: 0, color: '#ff0000' },
+    { x: 1, y: 0, z: 0, color: '#00ff00' }
+  ]
+};
+const group = r.addVoxelModel('voxel', voxelModel, 0, 0, 0, 1);
+assert(group.isGroup, 'voxel created group');
+assert(group.children.length === 2, 'voxel mesh count');
+const reusedGroup = r.addVoxelModel('voxel', voxelModel, 10, 20, Math.PI / 4, 1.5);
+assert(reusedGroup === group, 'voxel group reused');
+assert(group.position.x === 10 && group.position.y === -20, 'voxel position updated');
+assert(Math.abs(group.rotation.z + Math.PI / 4) < 1e-6, 'voxel rotation updated');
+
 r.beginFrame();
 r.addBlock('temp', 0, 0, 0x00ff00, 10);
 r.render();
