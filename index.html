@@ -67,6 +67,10 @@
     .toast.warn { border-left-color: var(--warning); }
     .toast.danger { border-left-color: var(--danger); }
     .footnote { color:#8aa2c0; font-size:12px; }
+    .bday-banner { position: fixed; left: 0; right: 0; top: 25%; text-align: center;
+      font-weight: 900; letter-spacing: .8px; font-size: clamp(24px, 6vw, 72px);
+      color: #ffe9a8; text-shadow: 0 6px 30px rgba(0,0,0,.45);
+      opacity: 0; pointer-events: none; transition: opacity 1s ease; z-index: 7; }
   </style>
   <script type="importmap">
     {
@@ -171,6 +175,11 @@
   const choice = (arr) => arr[(Math.random() * arr.length) | 0];
   const now = () => performance.now();
 
+  const CELEBRATION_COLORS = ['#ff5f5f','#ffd166','#06d6a0','#118ab2','#ef476f','#8ecae6','#f4a261','#e9c46a','#2a9d8f','#ff9b9b','#b2ff9f'];
+  function randBrightColor() {
+    return choice(CELEBRATION_COLORS);
+  }
+
   function spawnParticles(game, x, y, opts = {}) {
     const {
       angle = 0,
@@ -189,6 +198,13 @@
       const radius = Array.isArray(size) ? rand(size[0], size[1]) : size;
       game.particles.push(new Particle(x, y, vel, lifeSpan, col, radius));
     }
+  }
+
+  function isEliBirthday() {
+    try {
+      const d = new Date();
+      return d.getMonth() === 8 && d.getDate() === 24; // September 24
+    } catch { return false; }
   }
 
   const GROUND_TILE_SIZE = 64;
@@ -259,6 +275,7 @@
     supplyEveryMinMax: [8, 16],
     worldMargin: 80,
     scrollSpeed: 40,
+    specialChargeRequired: 30,
     player: {
       radius: 16, speed: 240, maxHP: 100, invuln: 0.7,
       baseFireRate: 4, baseBulletDamage: 15, bulletSpeed: 540,
@@ -274,9 +291,11 @@
     difficultyPerDay: { hp: 1.18, speed: 1.10, dmg: 1.12, spawnRate: 1.14 },
   };
 
+  const SPECIAL_CHARGE_REQUIRED = Math.max(CONFIG.specialChargeRequired ?? 30, 1);
+
   const SCENE_SEQUENCE = ['forest', 'sand', 'water', 'sand'];
   const SCENE_DURATION = 60;
-  const FOREST_TREE_PROB = 0.22;
+  const FOREST_TREE_PROB = 0.15;
 
   const TREE_COLLISION_RADIUS = 36;
 
@@ -456,6 +475,13 @@
     s.fillStyle = '#ffd36b'; s.fillRect(1,3,6,4);
   });
   Sprites.meteor = makeSprite(24,24,(s)=>{ s.fillStyle='#ff944d'; s.beginPath(); s.arc(12,12,12,0,Math.PI*2); s.fill(); });
+  // Balloon sprite for birthday mode
+  Sprites.balloon = makeSprite(10,16,(s)=>{
+    const col = '#ff4d7a';
+    s.fillStyle = col; s.beginPath(); s.arc(5,6,5,0,Math.PI*2); s.fill();
+    s.fillStyle = '#e83366'; s.beginPath(); s.arc(4,5,2.6,0,Math.PI*2); s.fill();
+    s.strokeStyle = '#c0c0c0'; s.lineWidth = 1; s.beginPath(); s.moveTo(5,11); s.lineTo(5,16); s.stroke();
+  });
   Sprites.crateGren = makeSprite(14,14,(s)=>{
     s.fillStyle='#101824'; s.fillRect(0,0,14,14);
     s.strokeStyle='#203049'; s.lineWidth=2; s.strokeRect(1,1,12,12);
@@ -562,6 +588,24 @@
     fill([-2, -3], [-1, 0], [3], fin);
     set(5, -1, 2, '#ffffff');
     set(5, -1, 1, '#000000');
+  });
+
+  // Simple low-poly boat the player stands in when on water
+  const BOAT_VOXEL_MODEL = createVoxelModel(4, ({ fill, set, setDynamic }) => {
+    setDynamic(false);
+    const hull = '#6b3f1f';
+    const rim = '#8b5a2b';
+    const deck = '#b78b5e';
+    // Base hull
+    fill([-4,-3,-2,-1,0,1,2,3,4], [-2,-1,0,1,2], [0], hull);
+    // Sides (rim)
+    fill([-4,-3,-2,-1,0,1,2,3,4], [-2,2], [1], rim);
+    fill([-4,4], [-2,-1,0,1,2], [1], rim);
+    // Deck slightly raised inside
+    fill([-3,-2,-1,0,1,2,3], [-1,0,1], [1], deck);
+    // Small bow tip
+    set(4, 0, 2, rim);
+    set(-4, 0, 2, rim);
   });
 
   const PTERO_VOXEL_MODEL = createVoxelModel(3, ({ fill, set, setBaseRotation }) => {
@@ -724,7 +768,8 @@
     water: WATER_VOXEL_MODEL,
     ptero: PTERO_VOXEL_MODEL,
     trex: TREX_VOXEL_MODEL,
-    mosasaurus: MOSA_VOXEL_MODEL
+    mosasaurus: MOSA_VOXEL_MODEL,
+    boat: BOAT_VOXEL_MODEL
   };
 
   Sprites.grass = makeSprite(12,6,(s)=>{
@@ -954,6 +999,95 @@
     const { Bullet, Missile } = createProjectileClasses(Entity, Vec2, Particle, rand, canvas);
     const Meteor = createMeteorClass(Entity, Vec2, Particle, rand, canvas);
 
+  class Balloon extends Entity {
+    constructor(x, y, color){
+      super(x, y, 8);
+      this.color = color || randBrightColor();
+      this.drift = rand(-18, 18);
+      this.speed = rand(62, 88);
+      this.popped = false;
+      if (typeof Balloon._nextId !== 'number') Balloon._nextId = 0;
+      this.renderId = `balloon${Balloon._nextId++}`;
+    }
+    pop(game){
+      if (this.popped) return;
+      this.popped = true; this.alive = false;
+      const burst = 20;
+      for (let i=0;i<burst;i++){
+        const ang = rand(0, Math.PI*2);
+        const spd = rand(100, 220);
+        const c = Math.random() < 0.5 ? this.color : randBrightColor();
+        game.particles.push(new Particle(this.pos.x, Math.max(0, this.pos.y), Vec2.fromAngle(ang, spd), .8, c, rand(1.2, 2.2)));
+      }
+      if (typeof AudioBus !== 'undefined' && AudioBus && typeof AudioBus.blip === 'function') {
+        AudioBus.blip({freq: 920, dur:.03, vol:.16});
+      }
+    }
+    update(dt, game){
+      this.pos.y -= this.speed * dt;
+      this.pos.x += this.drift * dt;
+      // Pop at top edge and burst confetti
+      if (!this.popped && this.pos.y <= -16) this.pop(game);
+      // Safety cull in case no game passed
+      if (this.pos.y < -64) this.alive = false;
+    }
+    draw(ctx){}
+  }
+
+  class FleeShadow extends Entity {
+    constructor(x,y,type){
+      super(x,y, 1);
+      this.type = type;
+      this.vel = new Vec2(rand(200,320), rand(-40,40));
+      this.life = 1.6;
+      if (typeof FleeShadow._nextId !== 'number') FleeShadow._nextId = 0;
+      this.renderId = `flee${FleeShadow._nextId++}`;
+    }
+    update(dt){ this.pos.add(this.vel.copy().scale(dt)); this.life -= dt; if (this.life <= 0) this.alive=false; }
+    draw(ctx){}
+  }
+
+  class Firework extends Entity {
+    constructor(x, y, color){
+      super(x, y, 3);
+      this.color = color || randBrightColor();
+      this.vel = new Vec2(rand(-30, 30), -rand(220, 300));
+      this.fuse = rand(0.8, 1.4);
+      this.trailTimer = 0;
+      if (typeof Firework._nextId !== 'number') Firework._nextId = 0;
+      this.renderId = `firework${Firework._nextId++}`;
+    }
+    update(dt, game){
+      this.trailTimer -= dt;
+      if (this.trailTimer <= 0) {
+        this.trailTimer = 0.06;
+        const trailV = Vec2.fromAngle(rand(Math.PI*0.9, Math.PI*1.1), rand(40, 90));
+        game.particles.push(new Particle(this.pos.x, this.pos.y, trailV, 0.35, this.color, 1.4));
+      }
+      this.pos.add(this.vel.copy().scale(dt));
+      this.vel.y += 30 * dt;
+      this.fuse -= dt;
+      const targetAlt = Math.max(60, canvas.height * 0.18);
+      if (this.fuse <= 0 || this.pos.y <= targetAlt) {
+        this.explode(game);
+        this.alive = false;
+      }
+    }
+    explode(game){
+      const n = 36;
+      for (let i=0;i<n;i++){
+        const ang = (i/n) * Math.PI*2 + rand(-0.05, 0.05);
+        const spd = rand(120, 260);
+        const c = Math.random() < 0.5 ? this.color : randBrightColor();
+        game.particles.push(new Particle(this.pos.x, this.pos.y, Vec2.fromAngle(ang, spd), .9, c, rand(1.4, 2.6)));
+      }
+      if (typeof AudioBus !== 'undefined' && AudioBus && typeof AudioBus.boom === 'function') {
+        AudioBus.boom({freq: 140, dur:.12, vol:.22});
+      }
+    }
+    draw(ctx){}
+  }
+
   class Supply extends Entity {
     constructor(x,y,type){ super(x,y, 14); this.type=type; this.pulse=0; }
     apply(player){
@@ -1104,6 +1238,7 @@
       this.time = 0; this.state = 'menu';
       this.player = new Player(canvas.width*0.5, canvas.height*0.6);
         this.bullets = []; this.enemies = []; this.grenades = []; this.supplies = []; this.particles = []; this.meteors = [];
+        this.balloons = []; this.fleeShadows = []; this.fireworks = [];
       this.sceneIndex = 0;
       this.sceneTimer = 0;
       this.environment = SCENE_SEQUENCE[this.sceneIndex];
@@ -1127,7 +1262,7 @@
       this.enemySpawnCD = CONFIG.baseSpawnInterval; this.supplyCD = rand(...CONFIG.supplyEveryMinMax);
       this.highScore = Number(localStorage.getItem('dino_highscore') || 0);
       this.kills = 0; this.score = 0;
-      this.specialCharge = 0; this.specialActive = false; this.specialTimer = 0; this.specialPulseTimer = 0;
+      this.specialCharge = 0; this.specialActive = false; this.specialTimer = 0; this.specialPulseTimer = 0; this.specialBirthday = false; this.specialBirthdayPulse = 0;
       updateHUD(this);
     }
     start(){ this.state='running'; hideOverlay(); showToast('Good luck, hunter!'); }
@@ -1145,24 +1280,96 @@
     }
     onKill(e, fromSpecial=false){
       this.kills++; this.score += 10 * (e.isBoss ? 30 : 1) * this.day;
-      if (!fromSpecial) this.specialCharge = Math.min(30, this.specialCharge + 1);
+      if (!fromSpecial) this.specialCharge = Math.min(SPECIAL_CHARGE_REQUIRED, this.specialCharge + 1);
       if (!e.isBoss && Math.random()<0.08) this.dropSupply(e.pos.x, e.pos.y);
       const color = e.isBoss ? '#ffd0d0' : (e instanceof Pterodactyl ? '#9de0ff' : '#6fe27e');
       for (let i=0;i<14;i++) this.particles.push(new Particle(e.pos.x, e.pos.y,
         Vec2.fromAngle(rand(0,Math.PI*2), rand(60,200)), .7, color, 2));
     }
       laserBlast(){
-        const w = canvas.width;
-        for (let i=0;i<5;i++) this.meteors.push(new Meteor(rand(0, w)));
-        const x=this.player.pos.x, y=this.player.pos.y;
+        const w = canvas.width, h = canvas.height;
+        if (!this.specialBirthday) {
+          for (let i=0;i<5;i++) this.meteors.push(new Meteor(rand(0, w)));
+          const x=this.player.pos.x, y=this.player.pos.y;
+          for (const e of this.enemies) {
+            if (!e.alive || e.isBoss) continue;
+            e.damage(9999);
+            if (!e.alive) this.onKill(e, true);
+          }
+          for (let i=0;i<36;i++) this.particles.push(new Particle(x,y, Vec2.fromAngle(i/36*Math.PI*2, 280), .4, '#ff7bff', 2));
+          AudioBus.boom({freq:120, dur:.2, vol:.3});
+          return;
+        }
+
+        this.specialBirthdayPulse = (this.specialBirthdayPulse || 0) + 1;
+        const confettiColors = CELEBRATION_COLORS;
+        const firstPulse = this.specialBirthdayPulse === 1;
+        if (firstPulse) {
+          // Firework bursts
+          for (let b=0; b<3; b++){
+            const fx = rand(w*0.15, w*0.85), fy = rand(h*0.25, h*0.55);
+            for (let i=0;i<32;i++){
+              const ang = rand(0, Math.PI*2);
+              const spd = rand(120, 260);
+              const col = confettiColors[(Math.random()*confettiColors.length)|0];
+              this.particles.push(new Particle(fx, fy, Vec2.fromAngle(ang, spd), .75, col, rand(1.2,2.2)));
+            }
+          }
+          // Confetti rain at top
+          for (let r=0; r<40; r++){
+            const cx = rand(0, w), cy = rand(0, h*0.35);
+            const col = confettiColors[(Math.random()*confettiColors.length)|0];
+            this.particles.push(new Particle(cx, cy, new Vec2(rand(-40,40), rand(60,140)), .8, col, rand(0.9,1.6)));
+          }
+          // Balloons rising — 3D spheres, random bright colors
+          for (let k=0; k<18; k++){
+            const bx = rand(20, w-20), by = h + rand(20, 80);
+            const col = randBrightColor();
+            this.balloons.push(new Balloon(bx, by, col));
+          }
+          // Fireworks rockets rising from the bottom
+          for (let r=0;r<2;r++){
+            const fx = rand(40, w-40), fy = h + rand(10, 60);
+            const col = randBrightColor();
+            this.fireworks.push(new Firework(fx, fy, col));
+          }
+        } else {
+          // Subsequent pulses: light sprinkle only
+          for (let i=0;i<18;i++){
+            const ang = rand(0, Math.PI*2);
+            const spd = rand(80, 150);
+            const col = confettiColors[(Math.random()*confettiColors.length)|0];
+            this.particles.push(new Particle(this.player.pos.x, this.player.pos.y - 30, Vec2.fromAngle(ang, spd), .5, col, rand(0.9,1.6)));
+          }
+        }
+        // Dinos flee and count as kills
         for (const e of this.enemies) {
           if (!e.alive || e.isBoss) continue;
           e.damage(9999);
           if (!e.alive) this.onKill(e, true);
         }
-      for (let i=0;i<36;i++) this.particles.push(new Particle(x,y, Vec2.fromAngle(i/36*Math.PI*2, 280), .4, '#ff7bff', 2));
-      AudioBus.boom({freq:120, dur:.2, vol:.3});
-    }
+        // Cheerful blips on the first pulse only
+        if (firstPulse) {
+          AudioBus.blip({freq: 660, dur:.05, vol:.18});
+          AudioBus.blip({freq: 880, dur:.05, vol:.18});
+        }
+        if (this.specialBirthdayPulse >= 3) this.specialBirthday = false;
+      }
+      showBirthdayBanner(){
+        const existing = document.getElementById('bdayBanner');
+        if (existing) {
+          try { existing.remove(); } catch {}
+        }
+        const el = document.createElement('div');
+        el.id = 'bdayBanner';
+        el.className = 'bday-banner';
+        el.textContent = 'Happy Birthday Eli!';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        requestAnimationFrame(()=>{ el.style.opacity = '1'; });
+        setTimeout(()=>{ el.style.opacity = '0'; }, 2200);
+        setTimeout(()=>{ try{el.remove();}catch{} }, 3200);
+      }
     dropSupply(x,y){
       const r = Math.random();
       const type = r < 0.35 ? 'grenade' : r < 0.6 ? 'machine' : r < 0.85 ? 'shotgun' : 'missile';
@@ -1227,6 +1434,15 @@
         this.scenery = [];
         this.seedForestTreesFromGrid(this.groundGrid);
       }
+    }
+    tileTypeAt(x, y){
+      const grid = this.groundGrid; if (!grid) return null;
+      const col = Math.floor(((x || 0) + (this.groundScrollX || 0)) / GROUND_TILE_SIZE);
+      const row = Math.floor((y || 0) / GROUND_TILE_SIZE);
+      if (row < 0 || row >= grid.rows) return null;
+      if (col < 0 || col >= grid.cols) return null;
+      const tile = grid.tiles[row]?.[col];
+      return tile ? tile.type : null;
     }
     spawnBullet(x,y, vel, dmg, ang, opts={}){
       if (opts.missile) {
@@ -1328,8 +1544,14 @@
       this.player.update(dt, this);
       if (Input.special) {
         Input.special = false;
-        if (this.specialCharge >= 30 && !this.specialActive) {
+        if (this.specialCharge >= SPECIAL_CHARGE_REQUIRED && !this.specialActive) {
           this.specialActive = true; this.specialTimer = 5; this.specialPulseTimer = 0; this.specialCharge = 0;
+          this.specialBirthday = isEliBirthday();
+          this.specialBirthdayPulse = 0;
+          if (this.specialBirthday) {
+            this.specialTimer = 3;
+          }
+          this.showBirthdayBanner();
         }
       }
       if (this.specialActive) {
@@ -1338,9 +1560,10 @@
         if (this.specialTimer <= 0) this.specialActive = false;
       }
 
-        for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles, this.meteors]) {
-        for (const e of arr) e.update?.(dt, this);
-      }
+        for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles, this.meteors, this.balloons, this.fleeShadows, this.fireworks]) {
+          if (!arr) continue;
+          for (const e of arr) e.update?.(dt, this);
+        }
 
       const scroll = CONFIG.scrollSpeed * dt;
       this.player.pos.x -= scroll;
@@ -1356,7 +1579,8 @@
         this.groundColumnStart = this.groundGrid.startCol;
         renderer3D.updateGround(this.groundGrid, null, 0, this.groundScrollX, true);
       }
-      for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles, this.meteors]) {
+      for (const arr of [this.bullets, this.enemies, this.grenades, this.supplies, this.particles, this.meteors, this.balloons, this.fleeShadows, this.fireworks]) {
+        if (!arr) continue;
         for (const e of arr) e.pos.x -= scroll;
       }
       if (this.environment !== 'water') {
@@ -1408,20 +1632,44 @@
         }
       }
 
+      // Bullet -> Balloons (shootable balloons)
+      if (this.balloons && this.balloons.length) {
+        for (const b of this.bullets) {
+          if (!b.alive) continue;
+          for (const bal of this.balloons) {
+            if (!bal.alive) continue;
+            if (boxHit(b, bal)) {
+              b.alive = false;
+              bal.pop(this);
+              break;
+            }
+          }
+        }
+      }
+
       // Player -> Supply
       for (const s of this.supplies) {
         if (boxHit(s, this.player)) { s.alive = false; s.apply(this.player); AudioBus.blip({freq: 520, dur:.05, vol:.15}); }
       }
 
       // Cull
-        this.bullets = this.bullets.filter(e => e.alive);
-        this.enemies = this.enemies.filter(e => e.alive);
-        this.grenades = this.grenades.filter(e => e.alive);
-        this.supplies = this.supplies.filter(e => e.alive);
-        this.particles = this.particles.filter(e => e.alive);
-        this.meteors = this.meteors.filter(e => e.alive);
-      if (this.particles.length > 400) {
-        this.particles.splice(0, this.particles.length - 400);
+        this.bullets = (this.bullets||[]).filter(e => e.alive);
+        this.enemies = (this.enemies||[]).filter(e => e.alive);
+        this.grenades = (this.grenades||[]).filter(e => e.alive);
+        this.supplies = (this.supplies||[]).filter(e => e.alive);
+        this.particles = (this.particles||[]).filter(e => e.alive);
+        this.meteors = (this.meteors||[]).filter(e => e.alive);
+        this.balloons = (this.balloons||[]).filter(e => e.alive);
+        this.fleeShadows = (this.fleeShadows||[]).filter(e => e.alive);
+        this.fireworks = (this.fireworks||[]).filter(e => e.alive);
+      if (this.particles.length > 300) {
+        this.particles.splice(0, this.particles.length - 300);
+      }
+      if (this.balloons.length > 60) {
+        this.balloons.splice(0, this.balloons.length - 60);
+      }
+      if (this.fireworks.length > 20) {
+        this.fireworks.splice(0, this.fireworks.length - 20);
       }
 
       // Boss lifecycle
@@ -1479,12 +1727,67 @@
       });
 
       this.meteors.forEach((m,i)=>renderer3D.addSprite(`meteor${i}`, Sprites.meteor, m.pos.x, m.pos.y, 0, m.radius/12));
+      // 3D balloons: colored spheres with tiny bead-string
+      if (this.balloons) {
+        for (const b of this.balloons) {
+          if (!b.renderId) {
+            if (typeof Balloon._nextId !== 'number') Balloon._nextId = 0;
+            b.renderId = `balloon${Balloon._nextId++}`;
+          }
+          const base = b.renderId;
+          const color = typeof b.color === 'string' ? parseInt(b.color.replace('#','0x')) : (b.color||0xff4081);
+          renderer3D.addSphere(`${base}:body`, b.pos.x, b.pos.y, 10, color);
+          // bead-string below the balloon (3 small spheres)
+          renderer3D.addSphere(`${base}:str0`, b.pos.x, b.pos.y + 10, 1, 0xc0c0c0);
+          renderer3D.addSphere(`${base}:str1`, b.pos.x + 0.5, b.pos.y + 13, 1, 0xc0c0c0);
+          renderer3D.addSphere(`${base}:str2`, b.pos.x - 0.5, b.pos.y + 16, 1, 0xc0c0c0);
+        }
+      }
+      // rising fireworks rockets
+      if (this.fireworks) {
+        for (const f of this.fireworks) {
+          if (!f.renderId) {
+            if (typeof Firework._nextId !== 'number') Firework._nextId = 0;
+            f.renderId = `firework${Firework._nextId++}`;
+          }
+          const color = typeof f.color === 'string' ? parseInt(f.color.replace('#','0x')) : (f.color||0xffffff);
+          renderer3D.addSphere(`${f.renderId}:core`, f.pos.x, f.pos.y, 2.5, color);
+        }
+      }
+      this.fleeShadows.forEach((f,i)=>{
+        let model = null, scale = 1;
+        if (f.type==='raptor') { model = VOXEL_MODELS.raptor; scale = 18/12; }
+        else if (f.type==='water') { model = VOXEL_MODELS.water; scale = 18/12; }
+        else if (f.type==='ptero') { model = VOXEL_MODELS.ptero; scale = 16/12; }
+        if (model) {
+          if (!f.renderId) {
+            if (typeof FleeShadow._nextId !== 'number') FleeShadow._nextId = 0;
+            f.renderId = `flee${FleeShadow._nextId++}`;
+          }
+          renderer3D.addVoxelModel(f.renderId, model, f.pos.x, f.pos.y, 0, scale);
+        }
+      });
 
       if (this.player) {
+        const onWater = this.tileTypeAt(this.player.pos.x, this.player.pos.y) === 'water';
+        if (onWater) {
+          // Boat appears under the player when on a water tile
+          renderer3D.addVoxelModel('boat', VOXEL_MODELS.boat, this.player.pos.x, this.player.pos.y + 4, 0, 2.4);
+        }
         renderer3D.addVoxelModel('player', PLAYER_VOXEL_MODEL, this.player.pos.x, this.player.pos.y, this.player.aim.angle(), this.player.radius/12);
       }
 
-      this.particles.forEach((p,i)=>renderer3D.addBlock(`particle${i}`, p.pos.x, p.pos.y, 0xffffff, p.radius*2));
+      this.particles.forEach((p,i)=>{
+        let color = 0xffffff;
+        if (typeof p.color === 'string') {
+          const hex = parseInt(p.color.replace('#','0x'));
+          if (!Number.isNaN(hex)) color = hex;
+        } else if (typeof p.color === 'number') {
+          color = p.color;
+        }
+        const opacity = Math.max(0.1, Math.min(1, p.life));
+        renderer3D.addBlock(`particle${i}`, p.pos.x, p.pos.y, color, p.radius*2, opacity);
+      });
 
       // 3D edge fog: two bands — positioned right at the border with minimal intrusion
       {
@@ -1496,9 +1799,9 @@
         for (let y = -s; y <= h + s; y += s) {
           // Left side: outside + near-edge (barely inside)
           renderer3D.addBlock(`fogL_out_${i}`, -half - s + inset, y, 0x000000, s, 1.0);
-          renderer3D.addBlock(`fogL_${i}`, -half + inset, y, 0x000000, s, 0.75);
+          renderer3D.addBlock(`fogL_${i}`, -half + inset, y, 0x000000, s, 0.95);
           // Right side: near-edge (barely inside) + outside
-          renderer3D.addBlock(`fogR_${i}`, w + half - inset, y, 0x000000, s, 0.75);
+          renderer3D.addBlock(`fogR_${i}`, w + half - inset, y, 0x000000, s, 0.95);
           renderer3D.addBlock(`fogR_out_${i}`, w + half + s - inset, y, 0x000000, s, 1.0);
           i++;
         }
@@ -1586,8 +1889,8 @@
       timeleft.textContent = game.bossAlive ? 'Boss!' : `${Math.max(0, Math.ceil(CONFIG.dayLength - game.dayTimer))}s`;
       hpbar.style.width = `${clamp(game.player.hp / game.player.maxHP, 0, 1) * 100}%`;
       hptext.textContent = Math.max(0, Math.ceil(game.player.hp));
-      spbar.style.width = `${clamp(game.specialCharge / 30, 0, 1) * 100}%`;
-      spbar.style.background = specialBarColor(game.specialCharge);
+      spbar.style.width = `${clamp(game.specialCharge / SPECIAL_CHARGE_REQUIRED, 0, 1) * 100}%`;
+      spbar.style.background = specialBarColor(game.specialCharge, SPECIAL_CHARGE_REQUIRED);
   }
 
   const overlay = document.getElementById('overlay');
