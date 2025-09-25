@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 
 const GROUND_TILE_SIZE = 64;
+const BLOCK_GEOMETRY_STEP = 0.25;
+const BLOCK_GEOMETRY_MIN = 0.25;
 
 const GROUND_COLORS = {
   grass: 0x2a6b33,
@@ -58,32 +60,132 @@ export class Renderer3D {
     this.groundMaterialCache = new Map();
 
     this.addBlock = (id, x, y, color = 0xffffff, size = 20, opacity = 1) => {
-      let geometry = this.blockGeoCache.get(size);
+      let colorHex;
+      if (typeof color === 'number' && Number.isFinite(color)) {
+        colorHex = color;
+      } else {
+        const str = String(color).trim();
+        const normalized = str.startsWith('#') ? `0x${str.slice(1)}` : str;
+        const parsed = Number.parseInt(normalized, 16);
+        colorHex = Number.isNaN(parsed) ? 0xffffff : parsed;
+      }
+      const sizeValue = Number.isFinite(size) && size > 0 ? size : 20;
+      const opacityClamped = Math.max(0, Math.min(1, Number.isFinite(opacity) ? opacity : 1));
+      const quantizedSize = Math.max(BLOCK_GEOMETRY_MIN, Math.round(sizeValue / BLOCK_GEOMETRY_STEP) * BLOCK_GEOMETRY_STEP);
+      const geometryKey = Number(quantizedSize.toFixed(2));
+      const scaleFactor = quantizedSize > 0 ? sizeValue / quantizedSize : 1;
+      let geometry = this.blockGeoCache.get(geometryKey);
       if (!geometry) {
-        geometry = new THREE.BoxGeometry(size, size, size);
-        this.blockGeoCache.set(size, geometry);
+        geometry = new THREE.BoxGeometry(quantizedSize, quantizedSize, quantizedSize);
+        this.blockGeoCache.set(geometryKey, geometry);
       }
-      const key = `${color}|${opacity}`;
-      let material = this.blockMatCache.get(key);
-      if (!material) {
-        material = new THREE.MeshLambertMaterial({ color, transparent: opacity < 1, opacity });
-        this.blockMatCache.set(key, material);
+      const usingSharedGeometry = Boolean(geometry);
+
+      const opacityKey = Number(opacityClamped.toFixed(3));
+      const targetTransparent = opacityClamped < 1;
+      const cacheMaterial = opacityKey === 1 || opacityKey === 0.95 || opacityKey === 0;
+      const materialKey = cacheMaterial ? `${colorHex}|${opacityKey}` : null;
+      let cachedMaterial = null;
+      if (cacheMaterial && materialKey) {
+        cachedMaterial = this.blockMatCache.get(materialKey);
+        if (!cachedMaterial) {
+          cachedMaterial = new THREE.MeshLambertMaterial({
+            color: colorHex,
+            transparent: targetTransparent,
+            opacity: opacityKey
+          });
+          this.blockMatCache.set(materialKey, cachedMaterial);
+        }
       }
+
       let mesh = this.objects.get(id);
       const isReusable = mesh && mesh.userData?.kind === 'block';
-      if (isReusable) {
-        if (mesh.geometry !== geometry) mesh.geometry = geometry;
-        if (mesh.material !== material) mesh.material = material;
-      } else {
+      if (!isReusable) {
         if (mesh) {
           this._disposeObject(mesh);
         }
-        mesh = new THREE.Mesh(geometry, material);
-        mesh.userData = { kind: 'block', sharedGeometry: true, sharedMaterial: true };
+        const meshGeometry = geometry || new THREE.BoxGeometry(sizeValue, sizeValue, sizeValue);
+        const meshMaterial = cachedMaterial || new THREE.MeshLambertMaterial({
+          color: colorHex,
+          transparent: targetTransparent,
+          opacity: opacityClamped
+        });
+        mesh = new THREE.Mesh(meshGeometry, meshMaterial);
+        mesh.userData = {
+          kind: 'block',
+          sharedGeometry: usingSharedGeometry,
+          sharedMaterial: Boolean(cachedMaterial),
+          geometryKey,
+          materialKey,
+          size: sizeValue,
+          color: colorHex,
+          opacity: opacityClamped,
+          scale: scaleFactor
+        };
         mesh.isBlock = true;
+        mesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
         this.scene.add(mesh);
         this.objects.set(id, mesh);
+      } else {
+        if (mesh.userData.geometryKey !== geometryKey) {
+          if (!mesh.userData.sharedGeometry && mesh.geometry && typeof mesh.geometry.dispose === 'function') {
+            mesh.geometry.dispose();
+          }
+          mesh.geometry = geometry;
+          mesh.userData.sharedGeometry = usingSharedGeometry;
+          mesh.userData.geometryKey = geometryKey;
+        }
+
+        if (cachedMaterial) {
+          if (!mesh.userData.sharedMaterial || mesh.userData.materialKey !== materialKey) {
+            if (!mesh.userData.sharedMaterial && mesh.material && typeof mesh.material.dispose === 'function') {
+              mesh.material.dispose();
+            }
+            mesh.material = cachedMaterial;
+            mesh.userData.sharedMaterial = true;
+            mesh.userData.materialKey = materialKey;
+          }
+          mesh.userData.sharedMaterial = true;
+          mesh.userData.materialKey = materialKey;
+        } else {
+          if (mesh.userData.sharedMaterial || !mesh.material) {
+            if (!mesh.userData.sharedMaterial && mesh.material && typeof mesh.material.dispose === 'function') {
+              mesh.material.dispose();
+            }
+            mesh.material = new THREE.MeshLambertMaterial({
+              color: colorHex,
+              transparent: targetTransparent,
+              opacity: opacityClamped
+            });
+          }
+          const mat = mesh.material;
+          if (mat) {
+            if (mat.color.getHex() !== colorHex) {
+              mat.color.setHex(colorHex);
+            }
+            if (Math.abs(mat.opacity - opacityClamped) > 1e-3) {
+              mat.opacity = opacityClamped;
+            }
+            const nextTransparent = targetTransparent;
+            if (mat.transparent !== nextTransparent) {
+              mat.transparent = nextTransparent;
+              mat.needsUpdate = true;
+            }
+          }
+          mesh.userData.sharedMaterial = false;
+          mesh.userData.materialKey = null;
+        }
+
+        if (mesh.userData.scale !== scaleFactor) {
+          mesh.scale.set(scaleFactor, scaleFactor, scaleFactor);
+          mesh.userData.scale = scaleFactor;
+        }
+
+        mesh.userData.size = sizeValue;
+        mesh.userData.color = colorHex;
+        mesh.userData.opacity = opacityClamped;
       }
+
       mesh.position.set(x, -y, 0);
       if (this._unusedIds) this._unusedIds.delete(id);
       return mesh;

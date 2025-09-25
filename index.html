@@ -281,7 +281,7 @@
       baseFireRate: 4, baseBulletDamage: 15, bulletSpeed: 540,
       fireRatePerLevel: 1.0, dmgPerLevel: 5, maxMachineLevel: 10,
       shotgunFireRate: 0.6, maxShotgunLevel: 10, maxMissileLevel: 10,
-      grenadeFuse: 0.85, grenadeRadius: 120, grenadeDamage: 140, grenadeSpeed: 420, missileCooldown: 5,
+      grenadeFuse: 0.85, grenadeRadius: 160, grenadeDamage: 140, grenadeSpeed: 420, missileCooldown: 5,
     },
     enemies: {
       raptor: { speed: [110, 160], radius: 18, hp: 32, dmg: 12 },
@@ -930,12 +930,28 @@
       if (this.missileLevel <= 0) return;
       const level = this.missileLevel;
       const speed = CONFIG.player.bulletSpeed * (1.2 + 0.05 * (level - 1));
-      const vel = Vec2.fromAngle(this.aim.angle(), speed);
-      const opts = { missile:true };
+      const target = this.findMissileTarget(game);
+      let launchDir = this.aim.copy();
+      if (target) {
+        const offset = target.pos.copy().sub(this.pos);
+        const dist = offset.len();
+        if (dist > 1e-3) {
+          launchDir = offset.scale(1 / dist);
+        }
+      }
+      let dirLength = launchDir.len();
+      if (dirLength <= 1e-3) {
+        launchDir = Vec2.fromAngle(this.aim.angle(), 1);
+      } else if (Math.abs(dirLength - 1) > 1e-3) {
+        launchDir.scale(1 / dirLength);
+      }
+      const angle = launchDir.angle();
+      const vel = launchDir.copy().scale(speed);
+      const opts = { missile: true, speed, target: target || null, seekTarget: true };
       if (level === 10) { opts.explosive = true; opts.glow = true; }
-      game.spawnBullet(this.pos.x + this.aim.x*this.radius, this.pos.y + this.aim.y*this.radius, vel, this.bulletDamage*2, this.aim.angle(), opts);
-      spawnParticles(game, this.pos.x + this.aim.x*(this.radius+4), this.pos.y + this.aim.y*(this.radius+4), {
-        angle: this.aim.angle(),
+      game.spawnBullet(this.pos.x + launchDir.x*this.radius, this.pos.y + launchDir.y*this.radius, vel, this.bulletDamage*2, angle, opts);
+      spawnParticles(game, this.pos.x + launchDir.x*(this.radius+4), this.pos.y + launchDir.y*(this.radius+4), {
+        angle,
         spread: 0.18,
         count: 6,
         speed: [220, 320],
@@ -953,6 +969,27 @@
         this.aim.copy().scale(CONFIG.player.grenadeSpeed)
       );
       game.grenades.push(g); AudioBus.blip({freq: 200, dur:.06, vol:.18});
+    }
+    findMissileTarget(game){
+      if (!game || !Array.isArray(game.enemies)) return null;
+      const aimDir = this.aim.copy();
+      let best = null;
+      let bestDot = -Infinity;
+      let bestDist = Infinity;
+      for (const enemy of game.enemies) {
+        if (!enemy || !enemy.alive) continue;
+        const offset = enemy.pos.copy().sub(this.pos);
+        const dist = offset.len();
+        if (dist <= 1e-3) continue;
+        const dir = offset.copy().scale(1 / dist);
+        const dot = dir.x * aimDir.x + dir.y * aimDir.y;
+        if (dot > bestDot + 1e-4 || (Math.abs(dot - bestDot) <= 1e-4 && dist < bestDist)) {
+          best = enemy;
+          bestDot = dot;
+          bestDist = dist;
+        }
+      }
+      return best;
     }
     healToFull(){ this.hp = this.maxHP; }
     draw(ctx, game){
@@ -1447,6 +1484,26 @@
     spawnBullet(x,y, vel, dmg, ang, opts={}){
       if (opts.missile) {
         const m = new Missile(x,y, vel, dmg, ang);
+        if (typeof opts.speed === 'number' && Number.isFinite(opts.speed)) {
+          m.baseSpeed = Math.max(Math.abs(opts.speed), 1);
+          const currentLen = m.vel.len();
+          if (currentLen > 1e-3) {
+            m.vel.scale(m.baseSpeed / currentLen);
+          } else {
+            m.vel.set(Math.cos(ang), Math.sin(ang)).scale(m.baseSpeed);
+          }
+        }
+        if (opts.target && opts.target.alive) {
+          m.target = opts.target;
+        } else if (opts.seekTarget) {
+          m.target = m.findTarget(this);
+        }
+        if (!m.baseSpeed || !Number.isFinite(m.baseSpeed)) {
+          m.baseSpeed = Math.max(m.vel.len(), 1);
+        }
+        if (typeof opts.turnRate === 'number' && Number.isFinite(opts.turnRate)) {
+          m.turnRate = Math.min(Math.max(opts.turnRate, 0), 1);
+        }
         if (opts.glow) m.glow = true;
         if (opts.explosive) m.explosive = true;
         this.bullets.push(m);

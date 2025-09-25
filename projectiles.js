@@ -50,8 +50,11 @@ export function createProjectileClasses(Entity, Vec2, Particle, rand = Math.rand
       super(x, y, vel, dmg, ang, 2.5, 6);
       this.target = null;
       this.trailTimer = Infinity;
+      this.baseSpeed = Math.max(vel.len(), 1);
+      this.turnRate = 0.18;
     }
     findTarget(game) {
+      if (!game || !Array.isArray(game.enemies)) return null;
       let closest = null;
       let dist = Infinity;
       for (const e of game.enemies) {
@@ -62,18 +65,39 @@ export function createProjectileClasses(Entity, Vec2, Particle, rand = Math.rand
       return closest;
     }
     update(dt, game) {
-      if (!this.target) this.target = this.findTarget(game);
-      if (this.target && !this.target.alive) {
+      if (!this.target) {
+        this.target = this.findTarget(game);
+      } else if (!this.target.alive) {
         this.alive = false;
         return;
       }
-      if (this.target) {
-        const speed = this.vel.len();
-        const desired = this.target.pos.copy().sub(this.pos).norm().scale(speed);
-        this.vel.add(desired.sub(this.vel).scale(0.1));
-        this.ang = this.vel.angle();
+      const speed = this.baseSpeed || this.vel.len() || 1;
+      if (this.target && this.target.alive) {
+        const offset = this.target.pos.copy().sub(this.pos);
+        const distance = offset.len();
+        if (distance > 1e-3) {
+          const desired = offset.scale(1 / distance);
+          const current = this.vel.copy().norm();
+          const blend = Math.min(Math.max(this.turnRate, 0), 1);
+          const nx = current.x * (1 - blend) + desired.x * blend;
+          const ny = current.y * (1 - blend) + desired.y * blend;
+          const len = Math.hypot(nx, ny) || 1;
+          this.vel.set(nx / len, ny / len).scale(speed);
+          this.ang = this.vel.angle();
+        }
+      } else {
+        const currentLen = this.vel.len();
+        if (Math.abs(currentLen - speed) > 1e-3) {
+          if (currentLen > 1e-3) {
+            this.vel.scale(speed / currentLen);
+          } else {
+            this.vel.set(Math.cos(this.ang), Math.sin(this.ang)).scale(speed);
+          }
+        }
       }
-      game.particles.push(new Particle(this.pos.x, this.pos.y, Vec2.fromAngle(rand(0, Math.PI*2), 30), .35, '#8de6ff', 2));
+      if (game) {
+        game.particles.push(new Particle(this.pos.x, this.pos.y, Vec2.fromAngle(rand(0, Math.PI*2), 30), .35, '#8de6ff', 2));
+      }
       super.update(dt, game);
     }
   }
