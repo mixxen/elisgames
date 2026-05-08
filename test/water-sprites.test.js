@@ -37,14 +37,15 @@ function hasRect(rects, x, y, w, h) {
   return rects.some(r => r.x === x && r.y === y && r.w === w && r.h === h);
 }
 
-// Water dino should not have feet rectangles
+// Water dino should use the blue raptor-like silhouette
 {
   const painter = extractPainter('waterdino');
   const rects = recordRects(painter);
-  assert.ok(!hasRect(rects, 11, 17, 3, 3));
-  assert.ok(!hasRect(rects, 15, 17, 3, 3));
-  assert.ok(!hasRect(rects, 11, 20, 1, 1));
-  assert.ok(!hasRect(rects, 16, 20, 1, 1));
+  assert.ok(hasRect(rects, 10, 17, 3, 3));
+  assert.ok(hasRect(rects, 15, 17, 3, 3));
+  assert.ok(hasRect(rects, 9, 20, 4, 1));
+  assert.ok(hasRect(rects, 15, 20, 4, 1));
+  assert.ok(hasRect(rects, 21, 10, 2, 2));
 }
 
 // Mosasaurus boss should not have foot rectangles

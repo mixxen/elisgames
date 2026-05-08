@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voxel Model Viewer</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.164.0/build/three.module.js"
+      }
+    }
+  </script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101316;
+      --panel: #181d21;
+      --panel-2: #20272c;
+      --line: #354047;
+      --text: #ecf2ea;
+      --muted: #9aa69d;
+      --accent: #74c69d;
+      --accent-2: #e0a84f;
+      --danger: #e56b6f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.4 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+    button, input, select, textarea {
+      font: inherit;
+      color: inherit;
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 292px minmax(360px, 1fr) 360px;
+      height: 100vh;
+      min-width: 920px;
+    }
+    aside {
+      min-width: 0;
+      overflow: auto;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      padding: 16px;
+    }
+    aside.right {
+      border-right: 0;
+      border-left: 1px solid var(--line);
+    }
+    main {
+      position: relative;
+      min-width: 0;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(0deg, rgba(255,255,255,.035) 1px, transparent 1px),
+        #11171a;
+      background-size: 44px 44px;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    canvas:active { cursor: grabbing; }
+    h1 {
+      margin: 0 0 16px;
+      font-size: 18px;
+      line-height: 1.2;
+      font-weight: 750;
+    }
+    h2 {
+      margin: 22px 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 750;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      margin: 10px 0;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    select, input, textarea {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #101417;
+      padding: 9px 10px;
+      outline: none;
+    }
+    input[type="checkbox"] {
+      width: auto;
+      justify-self: start;
+    }
+    select:focus, input:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(116,198,157,.16);
+    }
+    textarea {
+      min-height: 220px;
+      resize: vertical;
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      white-space: pre;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .row.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    button {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-2);
+      padding: 7px 10px;
+      color: var(--text);
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button.primary {
+      background: #1f5d46;
+      border-color: #2d8a68;
+    }
+    button.warn {
+      border-color: #87564b;
+      background: #4a2a27;
+      color: #ffd9d6;
+    }
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 6px;
+    }
+    .swatch {
+      aspect-ratio: 1;
+      min-height: 0;
+      padding: 0;
+      border-radius: 5px;
+      border: 1px solid rgba(255,255,255,.35);
+    }
+    .swatch.active {
+      outline: 2px solid var(--accent-2);
+      outline-offset: 2px;
+    }
+    .status {
+      position: absolute;
+      left: 14px;
+      bottom: 14px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      pointer-events: none;
+    }
+    .pill {
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 999px;
+      background: rgba(10,12,14,.72);
+      padding: 5px 9px;
+      backdrop-filter: blur(6px);
+    }
+    .voxel-list {
+      display: grid;
+      gap: 6px;
+      max-height: 250px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .voxel-item {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      min-height: 32px;
+      text-align: left;
+      border-radius: 5px;
+    }
+    .voxel-item.selected {
+      border-color: var(--accent-2);
+      background: #2c2f22;
+    }
+    .chip {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,.3);
+    }
+    .count {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @media (max-width: 980px) {
+      body { overflow: auto; }
+      .app {
+        grid-template-columns: 1fr;
+        height: auto;
+        min-width: 0;
+      }
+      main {
+        order: -1;
+        height: 58vh;
+        min-height: 420px;
+      }
+      aside, aside.right {
+        border: 0;
+        border-bottom: 1px solid var(--line);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside>
+      <h1>Voxel Model Viewer</h1>
+      <label>Model
+        <select id="modelSelect"></select>
+      </label>
+      <div class="row two">
+        <label>Voxel Size
+          <input id="voxelSize" type="number" min="1" step="1">
+        </label>
+        <label>Layer
+          <input id="layer" type="number" step="1">
+        </label>
+      </div>
+      <label>
+        <input id="showLayerOnly" type="checkbox">
+        Show Selected Layer Only
+      </label>
+
+      <h2>Selected Voxel</h2>
+      <div class="row">
+        <label>X<input id="xInput" type="number" step="1"></label>
+        <label>Y<input id="yInput" type="number" step="1"></label>
+        <label>Z<input id="zInput" type="number" step="1"></label>
+      </div>
+      <label>Color
+        <input id="colorInput" type="color">
+      </label>
+      <div id="swatches" class="swatches"></div>
+      <div class="toolbar">
+        <button id="addBtn" class="primary">Add/Update</button>
+        <button id="deleteBtn" class="warn">Delete</button>
+        <button id="cloneBtn">Clone +X</button>
+        <button id="centerBtn">Center</button>
+      </div>
+
+      <h2>Transform</h2>
+      <div class="row">
+        <label>Rot X<input id="rotX" type="number" step="0.01"></label>
+        <label>Rot Y<input id="rotY" type="number" step="0.01"></label>
+        <label>Rot Z<input id="rotZ" type="number" step="0.01"></label>
+      </div>
+    </aside>
+
+    <main>
+      <canvas id="viewport"></canvas>
+      <div class="status">
+        <span class="pill" id="modelStats"></span>
+        <span class="pill" id="selectionStats"></span>
+      </div>
+    </main>
+
+    <aside class="right">
+      <h2>Voxels</h2>
+      <div id="voxelList" class="voxel-list"></div>
+      <h2>JSON</h2>
+      <textarea id="jsonOutput" spellcheck="false"></textarea>
+      <div class="toolbar">
+        <button id="applyJsonBtn" class="primary">Apply JSON</button>
+        <button id="exportBtn">Refresh Export</button>
+      </div>
+    </aside>
+  </div>
+
+  <script type="module" src="./model-viewer.js"></script>
+</body>
+</html>

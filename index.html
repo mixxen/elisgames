@@ -408,27 +408,34 @@
 
   // Raptor (24x24)
   Sprites.raptor = makeSprite(24,24,(s)=>{
-    const body='#4ecf63', belly='#a7f0b2';
-    s.fillStyle = body; s.fillRect(2,12,6,2); s.fillRect(6,11,4,4);
-    s.fillStyle = body; s.fillRect(9,9,9,8);
-    s.fillStyle = belly; s.fillRect(11,12,6,3);
-    s.fillStyle = body; s.fillRect(17,8,5,5);
-    px(s, 20,9,'#fff'); px(s, 20,10,'#fff'); px(s,21,10,'#000');
-    s.fillStyle = '#2a3c2f'; s.fillRect(11,17,3,3); s.fillRect(15,17,3,3);
-    s.fillStyle = '#eee'; px(s, 11,20,'#eee'); px(s, 16,20,'#eee');
+    const body='#5f7f3a', shade='#355326', belly='#c8b47a', stripe='#263f1f', claw='#1b2018', tooth='#f8f0d8';
+    s.fillStyle = shade; s.fillRect(1,13,5,2); s.fillRect(3,12,5,2);
+    s.fillStyle = body; s.fillRect(5,11,5,4); s.fillRect(9,9,9,8);
+    s.fillStyle = '#71984b'; s.fillRect(10,8,7,2); s.fillRect(17,9,2,2);
+    s.fillStyle = belly; s.fillRect(11,13,6,2); s.fillRect(13,15,4,1);
+    s.fillStyle = stripe; s.fillRect(9,9,2,2); s.fillRect(12,9,2,3); s.fillRect(15,10,2,2);
+    s.fillStyle = body; s.fillRect(17,8,5,5); s.fillRect(21,10,2,2);
+    s.fillStyle = shade; s.fillRect(17,13,4,2); s.fillRect(18,7,3,1);
+    px(s, 20,9,'#f8f5df'); px(s,21,9,'#111'); px(s,22,12,tooth); px(s,20,13,tooth);
+    s.fillStyle = shade; s.fillRect(10,17,3,3); s.fillRect(15,17,3,3);
+    s.fillStyle = claw; s.fillRect(9,20,4,1); s.fillRect(15,20,4,1); px(s, 12,19,tooth); px(s, 18,19,tooth);
+    s.fillStyle = '#2f4724'; s.fillRect(15,12,1,1); s.fillRect(7,13,1,1); s.fillRect(13,11,1,1);
   });
 
   // Water Dino (24x24)
-  // Serpentine water creature without feet
   Sprites.waterdino = makeSprite(24,24,(s)=>{
-    const body='#5ab4ff', belly='#bfe9ff', fin='#3d94d9';
-    s.fillStyle = body; s.fillRect(2,12,20,4); // long body
-    s.fillRect(2,14,4,4); // tail curve
-    s.fillRect(16,8,4,4); // neck
-    s.fillRect(18,4,4,4); // head
-    s.fillStyle = belly; s.fillRect(4,13,12,2); // underside
-    s.fillStyle = fin; s.fillRect(8,8,4,4); // dorsal fin
-    px(s,19,5,'#fff'); px(s,20,5,'#000'); // eye
+    const body='#347fb1', shade='#17415e', belly='#bfe9ff', stripe='#0d2436', claw='#081018', tooth='#eefbff';
+    s.fillStyle = shade; s.fillRect(1,13,5,2); s.fillRect(3,12,5,2);
+    s.fillStyle = body; s.fillRect(5,11,5,4); s.fillRect(9,9,9,8);
+    s.fillStyle = '#57aee0'; s.fillRect(10,8,7,2); s.fillRect(17,9,2,2);
+    s.fillStyle = belly; s.fillRect(11,13,6,2); s.fillRect(13,15,4,1);
+    s.fillStyle = stripe; s.fillRect(9,9,2,2); s.fillRect(12,9,2,3); s.fillRect(15,10,2,2);
+    s.fillStyle = body; s.fillRect(17,8,5,5); s.fillRect(21,10,2,2);
+    s.fillStyle = shade; s.fillRect(17,13,4,2); s.fillRect(18,7,3,1);
+    px(s, 20,9,'#f8fdff'); px(s,21,9,'#081018'); px(s,22,12,tooth); px(s,20,13,tooth);
+    s.fillStyle = shade; s.fillRect(10,17,3,3); s.fillRect(15,17,3,3);
+    s.fillStyle = claw; s.fillRect(9,20,4,1); s.fillRect(15,20,4,1); px(s, 12,19,tooth); px(s, 18,19,tooth);
+    s.fillStyle = '#55d4ff'; s.fillRect(15,12,1,1); s.fillRect(7,13,1,1); s.fillRect(13,11,1,1);
   });
 
   // Pterodactyl (24x24)
@@ -444,15 +451,20 @@
 
   // T-Rex (48x48)
   Sprites.trex = makeSprite(48,48,(s)=>{
-    const body='#ff6b6b', belly='#ffd0d0', dark='#2a0613';
-    s.fillStyle = body; s.fillRect(8,16,28,18);
-    s.fillStyle = belly; s.fillRect(14,22,16,6);
-    s.fillStyle = body; s.fillRect(30,12,12,12);
-    s.fillStyle = dark; s.fillRect(39,14,3,3);
-    s.fillStyle = dark; s.fillRect(30,18,12,4);
-    s.fillStyle = '#7a2633'; s.fillRect(16,32,6,6); s.fillRect(26,32,6,6);
-    s.fillStyle = '#fff1f1'; s.fillRect(16,38,3,2); s.fillRect(29,38,3,2);
-    s.fillStyle = body; s.fillRect(2,20,8,6);
+    const body='#8f6f35', hi='#a98a4a', belly='#d1b875', dark='#3b2a1a', stripe='#4c3b20', jaw='#5d311f', tooth='#fff2cf';
+    s.fillStyle = dark; s.fillRect(2,24,7,4); s.fillRect(5,21,8,5);
+    s.fillStyle = body; s.fillRect(8,17,28,17); s.fillRect(12,15,20,4);
+    s.fillStyle = hi; s.fillRect(12,16,18,3); s.fillRect(30,13,9,3);
+    s.fillStyle = belly; s.fillRect(14,23,17,6); s.fillRect(20,29,10,2);
+    s.fillStyle = stripe; s.fillRect(13,17,3,5); s.fillRect(19,15,3,5); s.fillRect(26,16,3,6); s.fillRect(32,17,3,4);
+    s.fillStyle = body; s.fillRect(30,12,13,12); s.fillRect(39,15,6,5);
+    s.fillStyle = dark; s.fillRect(39,14,3,3); s.fillRect(34,11,6,2);
+    s.fillStyle = jaw; s.fillRect(31,19,14,4); s.fillRect(36,23,7,3);
+    s.fillStyle = tooth; s.fillRect(34,23,2,2); s.fillRect(39,23,2,2); s.fillRect(43,20,2,2);
+    s.fillStyle = '#5d4928'; s.fillRect(15,32,7,7); s.fillRect(27,32,7,7);
+    s.fillStyle = dark; s.fillRect(15,39,8,2); s.fillRect(28,39,8,2);
+    s.fillStyle = tooth; s.fillRect(21,38,2,2); s.fillRect(34,38,2,2);
+    s.fillStyle = dark; s.fillRect(28,25,5,3); s.fillRect(33,25,2,2);
   });
 
   // Mosasaurus (48x48)
@@ -503,274 +515,41 @@
     s.fillStyle='#64ff64'; s.fillRect(3,6,8,2); s.fillRect(8,4,3,6);
   });
 
-  function createVoxelModel(voxelSize, builder) {
-    const map = new Map();
-    const key = (x, y, z) => `${x},${y},${z}`;
-    let baseRotation = { x: 0, y: 0, z: 0 };
-    let dynamic = true;
-    const set = (x, y, z, color) => { map.set(key(x, y, z), { x, y, z, color }); };
-    const fill = (xs, ys, zs, color) => {
-      for (const x of xs) for (const y of ys) for (const z of zs) set(x, y, z, color);
+  const voxelModelLibrary = await fetch('./models/voxel-models.json')
+    .then((r) => {
+      if (!r.ok) throw new Error(`Unable to load voxel models: ${r.status}`);
+      return r.json();
+    });
+
+  function normalizeVoxelModel(model) {
+    return {
+      voxelSize: Number(model?.voxelSize) || 4,
+      baseRotation: {
+        x: Number(model?.baseRotation?.x) || 0,
+        y: Number(model?.baseRotation?.y) || 0,
+        z: Number(model?.baseRotation?.z) || 0,
+      },
+      dynamic: model?.dynamic !== false,
+      voxels: Array.isArray(model?.voxels) ? model.voxels.map((v) => ({
+        x: Number(v.x) || 0,
+        y: Number(v.y) || 0,
+        z: Number(v.z) || 0,
+        color: typeof v.color === 'string' ? v.color : '#ffffff'
+      })) : []
     };
-    builder({ set, fill, setBaseRotation: (rot) => {
-      baseRotation = {
-        x: Number(rot?.x) || 0,
-        y: Number(rot?.y) || 0,
-        z: Number(rot?.z) || 0,
-      };
-    }, setDynamic: (flag) => { dynamic = !!flag; }});
-    return { voxelSize, voxels: Array.from(map.values()), baseRotation, dynamic };
   }
 
-  const PLAYER_VOXEL_MODEL = createVoxelModel(4, ({ fill, set }) => {
-    // Boots & legs
-    fill([-1, 1], [-1, 0], [0], '#0d121a');
-    fill([-1, 1], [-1, 0], [1], '#22334a');
-    fill([-1, 0, 1], [-1, 0], [2], '#22334a');
-
-    // Torso
-    fill([-1, 0, 1], [-1, 0], [3, 4], '#3ec4ff');
-    fill([-1, 0, 1], [-1, 0], [5], '#3ec4ff');
-    set(0, -1, 4, '#bfe9ff');
-    set(1, -1, 3, '#bfe9ff');
-
-    // Arms
-    fill([-2, 2], [-1, 0], [3, 4], '#3ec4ff');
-    set(-2, -1, 3, '#f4d7c5');
-    set(2, -1, 3, '#f4d7c5');
-
-    // Neck & head
-    fill([0], [-1, 0], [5], '#f4d7c5');
-    fill([-1, 0, 1], [-1, 0], [6, 7], '#f4d7c5');
-    set(1, -1, 6, '#000000');
-
-    // Hair
-    fill([-1, 0, 1], [-1, 0], [8], '#3a2a1a');
-    fill([-1, 0, 1], [0], [7], '#3a2a1a');
-  });
-
-  const RAPTOR_VOXEL_MODEL = createVoxelModel(3, ({ fill, set }) => {
-    const scales = '#4ecf63', belly = '#a7f0b2', claw = '#1b2433', eye = '#f4f8ff', pupil = '#000000';
-    // Tail - long and tapered
-    fill([-6, -5, -4], [-1, 0], [1], scales);
-    fill([-6], [-1, 0], [0], scales);
-    fill([-3, -2], [-1, 0], [1, 2], scales);
-    // Body core with slightly arched back
-    fill([-1, 0, 1], [-1, 0], [1, 2], scales);
-    fill([-1, 0], [-1, 0], [2], belly);
-    // Chest / shoulder bulge
-    fill([2], [-1, 0], [2], scales);
-    set(2, -1, 2, belly);
-    // Neck and head angled forward
-    fill([2, 3], [-1, 0], [2, 3], scales);
-    set(3, -1, 3, eye);
-    set(3, -1, 2, pupil);
-    // Snout tip / jaw
-    fill([4], [-1, 0], [2], scales);
-    set(4, -1, 2, pupil);
-    // Arms tucked in front
-    fill([1, 2], [-1, 0], [3], scales);
-    set(2, -1, 3, claw);
-    set(2, 0, 3, claw);
-    // Powerful legs
-    fill([0, 1], [-1, 0], [0], claw);
-    fill([-1, -2], [-1, 0], [0], claw);
-    // Head crest accent
-    set(2, 0, 3, scales);
-  });
-
-  const WATER_VOXEL_MODEL = createVoxelModel(4, ({ fill, set }) => {
-    const body = '#5ab4ff', belly = '#bfe9ff', fin = '#3d94d9';
-    fill([-3, -2, -1, 0, 1, 2, 3, 4], [-1, 0], [1, 2], body);
-    fill([4, 5], [-1, 0], [2], body);
-    fill([-1, 0, 1, 2], [-1, 0], [1], belly);
-    fill([0, 1], [-1, 0], [3], fin);
-    fill([-2, -3], [-1, 0], [3], fin);
-    set(5, -1, 2, '#ffffff');
-    set(5, -1, 1, '#000000');
-  });
-
-  // Simple low-poly boat the player stands in when on water
-  const BOAT_VOXEL_MODEL = createVoxelModel(4, ({ fill, set, setDynamic }) => {
-    setDynamic(false);
-    const hull = '#6b3f1f';
-    const rim = '#8b5a2b';
-    const deck = '#b78b5e';
-    // Base hull
-    fill([-4,-3,-2,-1,0,1,2,3,4], [-2,-1,0,1,2], [0], hull);
-    // Sides (rim)
-    fill([-4,-3,-2,-1,0,1,2,3,4], [-2,2], [1], rim);
-    fill([-4,4], [-2,-1,0,1,2], [1], rim);
-    // Deck slightly raised inside
-    fill([-3,-2,-1,0,1,2,3], [-1,0,1], [1], deck);
-    // Small bow tip
-    set(4, 0, 2, rim);
-    set(-4, 0, 2, rim);
-  });
-
-  const PTERO_VOXEL_MODEL = createVoxelModel(3, ({ fill, set, setBaseRotation }) => {
-    const spar = '#9ddcff', membrane = '#6bb4e6', body = '#4b7fb3', beak = '#2f4f7a', claw = '#1f2533', eye = '#001a33';
-    setBaseRotation({ x: -Math.PI / 11, y: 0, z: 0 });
-
-    // Body spine and tail aligned with flight direction (positive X)
-    fill([-6, -5, -4, -3, -2, -1, 0], [-1, 0], [0], body);
-    fill([-8, -7], [-1, 0], [0], membrane);
-
-    // Head, crest & beak extending forward
-    fill([1, 2], [-1, 0], [0], body);
-    fill([2, 3, 4, 5, 6, 7], [-1, 0], [0], beak);
-    fill([4, 5, 6], [-1, 0], [-1], membrane);
-    set(4, -1, 0, eye);
-    set(4, 0, 0, eye);
-    set(7, -1, 0, '#d2e6ff');
-    set(5, -1, 1, body);
-
-    // Wings: tapered triangle with thicker root near body
-    const maxSpan = 6;
-    for (let y = -maxSpan; y <= maxSpan; y++) {
-      const absY = Math.abs(y);
-      const back = Math.max(1, 3 - Math.floor(absY / 2));
-      const forward = Math.max(0, 1 - Math.floor(absY / 3));
-      const sparXs = [];
-    for (let dx = -back; dx <= forward; dx++) sparXs.push(dx);
-      fill(sparXs, [y], [0], spar);
-
-      if (forward > 0) {
-        set(forward, y, 0, '#c7e3ff');
-      }
-
-      if (back > 1 || forward > 0) {
-        const innerXs = [];
-        for (let dx = -back + 1; dx <= forward - 1; dx++) innerXs.push(dx);
-        if (innerXs.length > 0) {
-          const zLayer = absY <= 1 ? 1 : absY <= 3 ? 0 : -1;
-          fill(innerXs, [y], [zLayer], membrane);
-        }
-      }
-    }
-
-    // Feet tucked under
-    set(-1, -1, -1, claw);
-    set(-1, 0, -1, claw);
-    set(0, -1, -1, claw);
-    set(0, 0, -1, claw);
-  });
-
-  const TREX_VOXEL_MODEL = createVoxelModel(6, ({ fill, set }) => {
-    const body = '#ff6b6b', belly = '#ffd0d0', dark = '#2a0613', eye = '#000000', tooth = '#ffe4e4';
-    // Tail — long and narrow tapering back
-    fill([-9, -8], [-1, 0], [2], body);
-    fill([-7, -6, -5], [-1, 0], [2, 3], body);
-    fill([-7], [-1, 0], [1], body);
-
-    // Powerful hips and torso
-    fill([-4, -3, -2, -1, 0, 1, 2], [-1, 0], [2, 3], body);
-    fill([-2, -1, 0], [-1, 0], [1], body);
-    fill([-1, 0, 1], [-1, 0], [2], belly);
-
-    // Massive head with jaw
-    fill([3, 4, 5], [-1, 0], [3, 4], body);
-    fill([5, 6], [-1, 0], [3, 4], body);
-    fill([4, 5, 6], [-1, 0], [2], belly);
-    fill([4, 5, 6], [-1, 0], [1], belly);
-    set(6, -1, 3, eye);
-    set(5, -1, 4, eye);
-    set(6, -1, 2, tooth);
-    set(6, 0, 2, tooth);
-
-    // Lower jaw depth
-    set(5, -1, 1, dark);
-    set(5, 0, 1, dark);
-
-    // Tiny arms tucked near chest
-    set(2, -1, 3, body);
-    set(2, -1, 2, dark);
-    set(2, 0, 2, dark);
-
-    // Powerful legs and feet
-    fill([-2, -1], [-1, 0], [0, 1], dark);
-    fill([0, 1], [-1, 0], [0, 1], dark);
-    set(-1, -1, -1, dark);
-    set(1, -1, -1, dark);
-  });
-
-  const MOSA_VOXEL_MODEL = createVoxelModel(6, ({ fill, set }) => {
-    const body = '#5ab4ff', belly = '#bfe9ff', dark = '#103b5b';
-    fill([-5, -4, -3, -2, -1, 0, 1, 2, 3, 4], [-1, 0], [2, 3], body);
-    fill([4, 5, 6], [-1, 0], [2], body);
-    fill([-2, -1, 0, 1, 2], [-1, 0], [1], belly);
-    fill([2, 3, 4], [-1, 0], [3], dark);
-    set(6, -1, 2, '#ffffff');
-    set(6, -1, 3, '#000000');
-  });
-
-  const TREE_OAK_VOXEL_MODEL = createVoxelModel(4, ({ fill, set, setDynamic }) => {
-    setDynamic(false);
-    const trunk = '#6f4424';
-    const leaves = '#2f7d31';
-    const highlight = '#4ea54a';
-    fill([-1, 0], [-1, 0], [0, 1, 2, 3, 4], trunk);
-    for (const z of [5, 6, 7]) {
-      fill([-3, -2, -1, 0, 1, 2, 3], [-3, -2, -1, 0, 1, 2, 3], [z], leaves);
-    }
-    fill([-2, -1, 0, 1, 2], [-2, -1, 0, 1, 2], [8], highlight);
-    fill([-3, -2, -1, 0, 1, 2, 3], [-3, -2, -1, 0, 1, 2, 3], [4], leaves);
-  });
-
-  const TREE_PINE_VOXEL_MODEL = createVoxelModel(4, ({ fill, set, setDynamic }) => {
-    setDynamic(false);
-    const trunk = '#5b3a1a';
-    const needles = '#1f5d2d';
-    fill([-1, 0], [-1, 0], [0, 1, 2, 3, 4], trunk);
-    let width = 4;
-    for (let z = 5; z <= 11; z++) {
-      const xs = [];
-      for (let dx = -width; dx <= width; dx++) xs.push(dx);
-      fill(xs, [-width, -width + 1, width - 1, width], [z], needles);
-      fill(xs, [ -width + 1, -width + 2, width - 2, width - 1], [z], needles);
-      width = Math.max(1, width - 1);
-    }
-    set(0, 0, 12, '#2f8748');
-  });
-
-  const TREE_BIRCH_VOXEL_MODEL = createVoxelModel(4, ({ fill, set, setDynamic }) => {
-    setDynamic(false);
-    const trunk = '#e8e8e8';
-    const bark = '#2f2f2f';
-    const canopy = '#5fae4a';
-    fill([-1, 0], [-1, 0], [0, 1, 2, 3, 4], trunk);
-    set(-1, -1, 1, bark); set(0, 0, 2, bark); set(-1, 0, 3, bark);
-    fill([-2, -1, 0, 1], [-2, -1, 0, 1], [5, 6, 7], canopy);
-    fill([-1, 0], [-1, 0], [8], '#7fdc6a');
-  });
-
-  const ROCK_VOXEL_MODEL = createVoxelModel(3, ({ fill, set, setDynamic }) => {
-    setDynamic(false);
-    const base = '#65707f';
-    const highlight = '#a4b1c2';
-    fill([-1, 0], [-1, 0], [0, 1], base);
-    fill([-2, -1, 0, 1], [-2, -1, 0, 1], [1, 2], base);
-    fill([-1, 0], [-1, 0], [3], highlight);
-    set(-2, -1, 1, highlight);
-    set(1, 0, 2, highlight);
-  });
-
-  const SCENERY_MODELS = {
-    tree_oak: { model: TREE_OAK_VOXEL_MODEL, scale: 3.2, radius: 42 },
-    tree_pine: { model: TREE_PINE_VOXEL_MODEL, scale: 3.4, radius: 46 },
-    tree_birch: { model: TREE_BIRCH_VOXEL_MODEL, scale: 3.0, radius: 38 },
-    rock: { model: ROCK_VOXEL_MODEL, scale: 2.4, radius: 24 }
-  };
-
-  const VOXEL_MODELS = {
-    player: PLAYER_VOXEL_MODEL,
-    raptor: RAPTOR_VOXEL_MODEL,
-    water: WATER_VOXEL_MODEL,
-    ptero: PTERO_VOXEL_MODEL,
-    trex: TREX_VOXEL_MODEL,
-    mosasaurus: MOSA_VOXEL_MODEL,
-    boat: BOAT_VOXEL_MODEL
-  };
+  const VOXEL_MODELS = Object.fromEntries(
+    Object.entries(voxelModelLibrary.models || {}).map(([name, model]) => [name, normalizeVoxelModel(model)])
+  );
+  const PLAYER_VOXEL_MODEL = VOXEL_MODELS.player;
+  const SCENERY_MODELS = Object.fromEntries(
+    Object.entries(voxelModelLibrary.scenery || {}).map(([name, meta]) => [name, {
+      model: VOXEL_MODELS[meta.model],
+      scale: Number(meta.scale) || 1,
+      radius: Number(meta.radius) || 0
+    }])
+  );
 
   Sprites.grass = makeSprite(12,6,(s)=>{
     s.fillStyle='#1e5d2b'; s.fillRect(0,3,12,3);
@@ -1318,7 +1097,8 @@
     onKill(e, fromSpecial=false){
       this.kills++; this.score += 10 * (e.isBoss ? 30 : 1) * this.day;
       if (!fromSpecial) this.specialCharge = Math.min(SPECIAL_CHARGE_REQUIRED, this.specialCharge + 1);
-      if (!e.isBoss && Math.random()<0.08) this.dropSupply(e.pos.x, e.pos.y);
+      if (e.isBoss) this.dropBossSupplies(e);
+      else if (Math.random()<0.16) this.dropSupply(e.pos.x, e.pos.y);
       const color = e.isBoss ? '#ffd0d0' : (e instanceof Pterodactyl ? '#9de0ff' : '#6fe27e');
       for (let i=0;i<14;i++) this.particles.push(new Particle(e.pos.x, e.pos.y,
         Vec2.fromAngle(rand(0,Math.PI*2), rand(60,200)), .7, color, 2));
@@ -1411,6 +1191,17 @@
       const r = Math.random();
       const type = r < 0.35 ? 'grenade' : r < 0.6 ? 'machine' : r < 0.85 ? 'shotgun' : 'missile';
       this.supplies.push(new Supply(x,y,type));
+    }
+    dropBossSupplies(boss){
+      const count = 1 + Math.floor(Math.random() * 3);
+      const spread = Math.max(36, boss.radius || 36);
+      for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2 + rand(-0.35, 0.35);
+        const distance = rand(spread * 0.35, spread * 0.85);
+        const x = clamp(boss.pos.x + Math.cos(angle) * distance, 24, canvas.width - 24);
+        const y = clamp(boss.pos.y + Math.sin(angle) * distance, 24, canvas.height - 24);
+        this.dropSupply(x, y);
+      }
     }
     shiftGroundColumns(grid, env){
       if (!grid) return;
@@ -1769,15 +1560,23 @@
         renderer3D.addSphere(`bullet${i}`, b.pos.x, b.pos.y, b.radius, color);
       });
 
+      const modelScale = {
+        raptor: 0.55,
+        water: 0.55,
+        ptero: 0.55,
+        trex: 0.75,
+        mosasaurus: 0.75
+      };
+
       this.enemies.forEach((e,i)=>{
         const ang = e.vel.angle();
         let model = null;
         let scale = 1;
-        if (e instanceof Raptor) { model = VOXEL_MODELS.raptor; scale = e.radius / 12; }
-        else if (e instanceof WaterDino) { model = VOXEL_MODELS.water; scale = e.radius / 12; }
-        else if (e instanceof Pterodactyl) { model = VOXEL_MODELS.ptero; scale = e.radius / 12; }
-        else if (e instanceof Mosasaurus) { model = VOXEL_MODELS.mosasaurus; scale = (e.radius / 24) * 1.5; }
-        else if (e instanceof TRex) { model = VOXEL_MODELS.trex; scale = (e.radius / 24) * 1.6; }
+        if (e instanceof Raptor) { model = VOXEL_MODELS.raptor; scale = (e.radius / 12) * modelScale.raptor; }
+        else if (e instanceof WaterDino) { model = VOXEL_MODELS.water; scale = (e.radius / 12) * modelScale.water; }
+        else if (e instanceof Pterodactyl) { model = VOXEL_MODELS.ptero; scale = (e.radius / 12) * modelScale.ptero; }
+        else if (e instanceof Mosasaurus) { model = VOXEL_MODELS.mosasaurus; scale = (e.radius / 24) * modelScale.mosasaurus; }
+        else if (e instanceof TRex) { model = VOXEL_MODELS.trex; scale = (e.radius / 24) * modelScale.trex; }
         if (model) {
           renderer3D.addVoxelModel(`enemy${i}`, model, e.pos.x, e.pos.y, ang, scale);
         }
@@ -1813,9 +1612,9 @@
       }
       this.fleeShadows.forEach((f,i)=>{
         let model = null, scale = 1;
-        if (f.type==='raptor') { model = VOXEL_MODELS.raptor; scale = 18/12; }
-        else if (f.type==='water') { model = VOXEL_MODELS.water; scale = 18/12; }
-        else if (f.type==='ptero') { model = VOXEL_MODELS.ptero; scale = 16/12; }
+        if (f.type==='raptor') { model = VOXEL_MODELS.raptor; scale = (18/12) * modelScale.raptor; }
+        else if (f.type==='water') { model = VOXEL_MODELS.water; scale = (18/12) * modelScale.water; }
+        else if (f.type==='ptero') { model = VOXEL_MODELS.ptero; scale = (16/12) * modelScale.ptero; }
         if (model) {
           if (!f.renderId) {
             if (typeof FleeShadow._nextId !== 'number') FleeShadow._nextId = 0;
